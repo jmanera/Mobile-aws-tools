@@ -1,0 +1,23 @@
+Mobile AWS Tools
+Copyright 2026 The Mobile AWS Tools Authors.
+
+This product includes software developed by Amazon.com, Inc. or its
+affiliates:
+
+  Session Manager Plugin
+  https://github.com/aws/session-manager-plugin
+  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+  Licensed under the Apache License, Version 2.0.
+
+This product includes a copy of twinj/uuid, as vendored by the Session
+Manager Plugin, in bridge/third_party/twinj-uuid:
+
+  Copyright (C) 2011 by Krzysztof Kowalik
+  Copyright (C) 2014 by Daniel Kemp, derivative work
+  Licensed under the MIT License (see bridge/third_party/twinj-uuid/LICENSE).
+
+Binary builds of the bridge also link, unmodified: the AWS SDK for Go v2 and
+smithy-go (Apache-2.0), gorilla/websocket (BSD-2-Clause), cihub/seelog
+(BSD-3-Clause), fsnotify (BSD-3-Clause), stretchr/testify and stretchr/objx
+(MIT), go.yaml.in/yaml/v3 (MIT and Apache-2.0), and the Go standard library
+and golang.org/x/sys (BSD-3-Clause).

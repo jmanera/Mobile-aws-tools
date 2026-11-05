@@ -1,0 +1,47 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include access keys, session tokens, account ids or instance ids you consider sensitive.
+        Security issues go through private reporting (see SECURITY.md), not here.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Include what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version or commit
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      placeholder: Pixel 8, Android 15
+  - type: input
+    id: target
+    attributes:
+      label: Target OS and SSM Agent version
+      placeholder: Amazon Linux 2023, agent 3.3.x
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Logcat lines tagged `ssmbridge`. Check them for secrets before posting.
+      render: text

@@ -1,0 +1,17 @@
+name: Task
+description: A planned piece of work from the roadmap
+labels: [task]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: A result that can be checked.
+    validations:
+      required: true
