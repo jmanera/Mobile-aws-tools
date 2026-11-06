@@ -13,11 +13,12 @@ Session Manager**: sign in with IAM Identity Center, pick an instance and get
 a shell from your phone, with no SSH keys and no inbound ports. More targets
 (RDS, DynamoDB) arrive as plugins.
 
-> **Status: phase 2 (instances) done.** The app signs in with IAM Identity
+> **Status: phase 3 (terminal) done.** The app signs in with IAM Identity
 > Center, lets you pick the account, role and region, lists the instances
-> whose SSM Agent is online and opens a shell on one. Output is plain text
-> until the terminal emulator of phase 3, so it is not a daily tool yet. See
-> the [roadmap](#roadmap).
+> whose SSM Agent is online and opens a shell on one in a full terminal
+> emulator: colours, vim, htop and less, an extra-keys row, rotation and
+> pinch to zoom. Keeping sessions alive in the background, reconnection and
+> a biometric lock come in phase 4. See the [roadmap](#roadmap).
 
 ## How it works
 
@@ -111,8 +112,8 @@ cd android && ./gradlew testDebugUnitTest :plugin-api:test
    Tap *Load credentials file* (the app reads the file and deletes it), then
    *Start session*.
 
-The spike shows output as plain text; a real terminal emulator arrives in
-phase 3. Never use long-lived IAM user keys with it.
+The spike shows output as plain text; sessions opened from the instance list
+use the terminal emulator. Never use long-lived IAM user keys with it.
 
 ## Signing in with IAM Identity Center
 
