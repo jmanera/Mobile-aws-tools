@@ -13,10 +13,11 @@ Session Manager**: sign in with IAM Identity Center, pick an instance and get
 a shell from your phone, with no SSH keys and no inbound ports. More targets
 (RDS, DynamoDB) arrive as plugins.
 
-> **Status: phase 1 (foundation and sign-in).** The app signs in with IAM
-> Identity Center, keeps the token encrypted and gets temporary role
-> credentials; a debug screen opens a shell with them. It is not usable as a
-> daily tool yet. See the [roadmap](#roadmap).
+> **Status: phase 2 (instances) done.** The app signs in with IAM Identity
+> Center, lets you pick the account, role and region, lists the instances
+> whose SSM Agent is online and opens a shell on one. Output is plain text
+> until the terminal emulator of phase 3, so it is not a daily tool yet. See
+> the [roadmap](#roadmap).
 
 ## How it works
 
@@ -161,8 +162,9 @@ permission sets to AWS accounts.
    region*: the app shows when its temporary credentials expire, and
    remembers the choice for the next start. They are renewed automatically, and the SSO
    token is refreshed without signing in again.
-5. In debug builds, open *SSM Spike (debug)*, enter the instance id and tap
-   *Start session with the selected role and region*.
+5. Tap *Show instances*: the list holds the EC2 instances whose SSM Agent is
+   online in that region. Tap one to open a shell. Without `tag:GetResources`
+   instances are listed by id instead of by their `Name` tag.
 
 The SSO token and the client registration are stored encrypted with a key in
 Android Keystore and are excluded from backups; role credentials stay in
