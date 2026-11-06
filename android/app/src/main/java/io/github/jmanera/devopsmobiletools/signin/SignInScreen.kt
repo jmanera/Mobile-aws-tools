@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.jmanera.devopsmobiletools.R
+import io.github.jmanera.devopsmobiletools.lock.LockSettingsSection
 import io.github.jmanera.devopsmobiletools.core.aws.context.AwsRegion
 import io.github.jmanera.devopsmobiletools.core.aws.context.AwsRegions
 import java.time.ZoneId
@@ -101,6 +102,7 @@ fun SignInScreen(onShowInstances: () -> Unit, vm: SignInViewModel = viewModel())
                 }
                 OutlinedButton(onClick = vm::signOut, modifier = Modifier.fillMaxWidth()) { Text("Sign out") }
                 PickerSection(vm, onShowInstances)
+                LockSettingsSection()
             }
         }
     }
