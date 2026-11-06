@@ -1,4 +1,4 @@
-module github.com/jmanera/Mobile-aws-tools/bridge
+module github.com/jmanera/devops-mobile-tools/bridge
 
 go 1.26.0
 

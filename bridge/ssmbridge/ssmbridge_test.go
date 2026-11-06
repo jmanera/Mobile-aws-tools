@@ -1,4 +1,4 @@
-// Copyright 2026 The Mobile AWS Tools Authors.
+// Copyright 2026 The DevOps Mobile Tools Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 package ssmbridge

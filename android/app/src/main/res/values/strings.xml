@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Mobile AWS Tools</string>
+    <string name="app_name">DevOps Mobile Tools</string>
+    <string name="tagline">Cloud operations on the go</string>
 </resources>

@@ -5,8 +5,10 @@
 
     <!-- No backups: the app holds SSO tokens and temporary AWS credentials. -->
     <application
-        android:name=".MobileAwsToolsApp"
+        android:name=".DevOpsMobileToolsApp"
         android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:label="@string/app_name"
         android:supportsRtl="true"

@@ -1,6 +1,6 @@
 # Security Policy
 
-Mobile AWS Tools handles AWS credentials and opens shells on cloud
+DevOps Mobile Tools handles AWS credentials and opens shells on cloud
 instances, so security reports are taken seriously.
 
 ## Reporting a vulnerability

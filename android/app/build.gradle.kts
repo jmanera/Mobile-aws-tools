@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "dev.mobileawstools"
+    namespace = "io.github.jmanera.devopsmobiletools"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "dev.mobileawstools"
+        applicationId = "io.github.jmanera.devopsmobiletools"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

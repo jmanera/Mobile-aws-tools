@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in Mobile AWS Tools. The project is in an early
+Thanks for your interest in DevOps Mobile Tools. The project is in an early
 phase, so the best way to help right now is to try the spike, open issues
 and review pull requests.
 
