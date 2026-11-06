@@ -64,6 +64,16 @@ jobs:
       - name: Lint
         working-directory: android
         run: ./gradlew lintDebug
+      # Android modules run testDebugUnitTest; pure Kotlin modules (plugin-api) run test.
+      - name: Unit tests
+        working-directory: android
+        run: ./gradlew testDebugUnitTest :plugin-api:test
+      - if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-reports
+          path: android/*/build/reports/tests/
+          retention-days: 7
       - name: Assemble debug APK
         if: github.event_name == 'workflow_dispatch'
         working-directory: android
