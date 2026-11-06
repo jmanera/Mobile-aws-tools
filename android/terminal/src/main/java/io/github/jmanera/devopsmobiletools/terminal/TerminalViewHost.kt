@@ -17,11 +17,16 @@ import com.termux.view.TerminalViewClient
 
 /**
  * Creates a [TerminalView] ready for a [RemoteTerminal]: JetBrains Mono,
- * keyboard on tap, the on-screen keyboard without suggestions.
+ * keyboard on tap, the on-screen keyboard without suggestions, and Ctrl and
+ * Alt from the extra-keys row applied to what is typed.
  */
-fun createTerminalView(context: Context, textSizeSp: Float = DEFAULT_TEXT_SIZE_SP): TerminalView {
+fun createTerminalView(
+    context: Context,
+    modifiers: StickyModifiers,
+    textSizeSp: Float = DEFAULT_TEXT_SIZE_SP,
+): TerminalView {
     val view = TerminalView(context, null)
-    view.setTerminalViewClient(ViewClient(view))
+    view.setTerminalViewClient(ViewClient(view, modifiers))
     view.setTextSize(
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, textSizeSp, context.resources.displayMetrics).toInt(),
     )
@@ -41,7 +46,10 @@ fun TerminalView.showKeyboard() {
     context.getSystemService(InputMethodManager::class.java)?.showSoftInput(this, 0)
 }
 
-private class ViewClient(private val view: TerminalView) : TerminalViewClient {
+private class ViewClient(
+    private val view: TerminalView,
+    private val modifiers: StickyModifiers,
+) : TerminalViewClient {
 
     override fun onScale(scale: Float): Float = 1f
 
@@ -66,9 +74,9 @@ private class ViewClient(private val view: TerminalView) : TerminalViewClient {
 
     override fun onLongPress(event: MotionEvent) = false
 
-    override fun readControlKey() = false
+    override fun readControlKey() = modifiers.consume(Modifier.CTRL)
 
-    override fun readAltKey() = false
+    override fun readAltKey() = modifiers.consume(Modifier.ALT)
 
     override fun readShiftKey() = false
 

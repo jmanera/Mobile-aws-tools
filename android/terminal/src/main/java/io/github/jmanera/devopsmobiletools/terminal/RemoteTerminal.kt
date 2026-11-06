@@ -24,6 +24,7 @@ import com.termux.view.TerminalView
 class RemoteTerminal(
     context: Context,
     transport: TerminalTransport,
+    private val modifiers: StickyModifiers,
     private val onFinished: () -> Unit = {},
 ) : TerminalSessionClient {
 
@@ -49,6 +50,24 @@ class RemoteTerminal(
 
     /** The remote side ended; [reason] is shown in the terminal. Any thread. */
     fun onClosed(reason: String) = session.onRemoteClosed(reason)
+
+    /** A key of the extra-keys row, with the Ctrl and Alt the row holds. Main thread. */
+    fun press(key: ExtraKey) {
+        when (key) {
+            is ExtraKey.Mod -> modifiers.tap(key.modifier)
+            is ExtraKey.Special -> {
+                val emulator = session.emulator ?: return
+                val code = key.code(
+                    modifiers.consumeMask(),
+                    emulator.isCursorKeysApplicationMode,
+                    emulator.isKeypadApplicationMode,
+                )
+                if (code != null) session.write(code)
+            }
+            // The view applies Ctrl and Alt to characters as it does for the keyboard.
+            is ExtraKey.Char -> view?.inputCodePoint(key.codePoint, false, false)
+        }
+    }
 
     /** Text as the user would type it, through bracketed paste if the program asked for it. */
     fun paste(text: String) {

@@ -16,7 +16,10 @@ import io.github.jmanera.devopsmobiletools.plugin.ConnectionListener
 import io.github.jmanera.devopsmobiletools.plugin.ConnectionState
 import io.github.jmanera.devopsmobiletools.plugin.Target
 import io.github.jmanera.devopsmobiletools.plugin.TerminalConnection
+import io.github.jmanera.devopsmobiletools.terminal.ExtraKey
+import io.github.jmanera.devopsmobiletools.terminal.Modifier
 import io.github.jmanera.devopsmobiletools.terminal.RemoteTerminal
+import io.github.jmanera.devopsmobiletools.terminal.StickyModifiers
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -33,6 +36,13 @@ class SessionViewModel(app: Application, val target: Target) : AndroidViewModel(
     var status by mutableStateOf("Starting session…")
         private set
     var state by mutableStateOf(ConnectionState.CONNECTING)
+        private set
+
+    /** CTRL and ALT of the extra-keys row; they outlive reconnections. */
+    val modifiers = StickyModifiers()
+
+    /** Mirrors [modifiers] for Compose. */
+    var modifierStates by mutableStateOf(modifierSnapshot())
         private set
 
     /** The current terminal; a reconnection starts a new one. */
@@ -67,12 +77,15 @@ class SessionViewModel(app: Application, val target: Target) : AndroidViewModel(
     }
 
     init {
+        modifiers.onChange = { modifierStates = modifierSnapshot() }
         connect()
     }
 
+    private fun modifierSnapshot() = Modifier.entries.associateWith(modifiers::state)
+
     fun connect() {
         if (connection != null) return
-        val t = RemoteTerminal(getApplication(), transport)
+        val t = RemoteTerminal(getApplication(), transport, modifiers)
         terminal = t
         show(ConnectionState.CONNECTING, "")
         viewModelScope.launch {
@@ -94,11 +107,12 @@ class SessionViewModel(app: Application, val target: Target) : AndroidViewModel(
         }
     }
 
-    /** Sends bytes as if typed; for keys the on-screen keyboard lacks. */
-    fun type(bytes: ByteArray) {
-        val session = terminal?.session ?: return
-        session.write(bytes, 0, bytes.size)
+    /** A key of the extra-keys row. */
+    fun press(key: ExtraKey) {
+        terminal?.press(key)
     }
+
+    fun lock(modifier: Modifier) = modifiers.lock(modifier)
 
     fun disconnect() {
         val c = connection ?: return
