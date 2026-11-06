@@ -1,4 +1,4 @@
-// Copyright 2026 The Mobile AWS Tools Authors.
+// Copyright 2026 The DevOps Mobile Tools Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 // Command ssmshell exercises the ssmbridge package from a desktop terminal,
@@ -18,7 +18,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/jmanera/Mobile-aws-tools/bridge/ssmbridge"
+	"github.com/jmanera/devops-mobile-tools/bridge/ssmbridge"
 )
 
 type stdoutListener struct{ done chan struct{} }

@@ -16,7 +16,7 @@ mkdir -p build
 gomobile bind \
   -target="$TARGETS" \
   -androidapi 26 \
-  -javapkg dev.mobileawstools \
+  -javapkg io.github.jmanera.devopsmobiletools \
   -ldflags="-s -w" \
   -trimpath \
   -o "$OUT" \

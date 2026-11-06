@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "dev.mobileawstools.core.aws"
+    namespace = "io.github.jmanera.devopsmobiletools.core.aws"
     compileSdk = 37
 
     defaultConfig {

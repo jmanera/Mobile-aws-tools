@@ -1,8 +1,17 @@
-# Mobile AWS Tools
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logo-horizontal-dark.svg">
+  <img alt="DevOps Mobile Tools — cloud operations on the go" src="docs/brand/logo-horizontal-light.svg" width="480">
+</picture>
 
-An open-source Android client for **AWS Systems Manager Session Manager**:
-sign in with IAM Identity Center, pick an EC2 instance and get an interactive
-shell from your phone, with no SSH keys and no inbound ports.
+# DevOps Mobile Tools
+
+**Cloud operations on the go.** An open-source Android app for the everyday
+operations work you would otherwise need a laptop for.
+
+The first tool is an interactive shell on EC2 through **AWS Systems Manager
+Session Manager**: sign in with IAM Identity Center, pick an instance and get
+a shell from your phone, with no SSH keys and no inbound ports. More targets
+(RDS, DynamoDB) arrive as plugins.
 
 > **Status: phase 1 (foundation and sign-in).** The app signs in with IAM
 > Identity Center, keeps the token encrypted and gets temporary role
@@ -41,6 +50,7 @@ Why, and what had to change, is recorded in
 | `android/terminal` | Terminal emulator view (phase 3) |
 | `android/bridge` | Exposes the gomobile AAR to the other modules |
 | `docs/adr/` | Architecture decision records |
+| `docs/brand/` | Logo, icon masters, palette and how the Android icon is built |
 
 ## Building
 
@@ -93,7 +103,7 @@ cd android && ./gradlew testDebugUnitTest :plugin-api:test
    truncates the token):
 
    ```sh
-   aws sts get-session-token --duration-seconds 3600 | adb shell "run-as dev.mobileawstools.debug sh -c 'umask 077; mkdir -p files; cat > files/credentials.json'"
+   aws sts get-session-token --duration-seconds 3600 | adb shell "run-as io.github.jmanera.devopsmobiletools.debug sh -c 'umask 077; mkdir -p files; cat > files/credentials.json'"
    ```
 
    Tap *Load credentials file* (the app reads the file and deletes it), then
@@ -166,7 +176,7 @@ memory.
 | 5 | Signed APK on GitHub Releases, docs, demo |
 | 6 | Plugin marketplace: RDS and DynamoDB plugins |
 
-Progress is tracked in [milestones](https://github.com/jmanera/Mobile-aws-tools/milestones).
+Progress is tracked in [milestones](https://github.com/jmanera/devops-mobile-tools/milestones).
 The app is distributed through GitHub Releases only, not Google Play.
 
 ## Contributing and security

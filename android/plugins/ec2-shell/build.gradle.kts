@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "dev.mobileawstools.plugins.ec2shell"
+    namespace = "io.github.jmanera.devopsmobiletools.plugins.ec2shell"
     compileSdk = 37
 
     defaultConfig {

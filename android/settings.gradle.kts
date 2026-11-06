@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MobileAwsTools"
+rootProject.name = "DevOpsMobileTools"
 include(":app", ":bridge", ":core-aws", ":plugin-api", ":plugins:ec2-shell", ":terminal")
