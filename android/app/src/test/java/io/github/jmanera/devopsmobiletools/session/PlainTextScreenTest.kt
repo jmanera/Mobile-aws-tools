@@ -1,7 +1,7 @@
 // Copyright 2026 The DevOps Mobile Tools Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package io.github.jmanera.devopsmobiletools.spike
+package io.github.jmanera.devopsmobiletools.session
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

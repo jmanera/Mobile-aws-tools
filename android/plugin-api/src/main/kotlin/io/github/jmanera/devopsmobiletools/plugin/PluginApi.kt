@@ -4,7 +4,7 @@
 package io.github.jmanera.devopsmobiletools.plugin
 
 /** Version of the plugin contract, following SemVer. */
-const val PLUGIN_API_VERSION = "0.1.0"
+const val PLUGIN_API_VERSION = "0.2.0"
 
 /**
  * Whether a plugin built against [pluginApiVersion] can run on this contract.

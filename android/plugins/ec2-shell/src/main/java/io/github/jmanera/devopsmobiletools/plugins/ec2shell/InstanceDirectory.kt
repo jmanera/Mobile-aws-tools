@@ -10,8 +10,11 @@ import aws.sdk.kotlin.services.resourcegroupstaggingapi.model.TagFilter
 import aws.sdk.kotlin.services.ssm.SsmClient
 import aws.sdk.kotlin.services.ssm.describeInstanceInformation
 import aws.sdk.kotlin.services.ssm.model.InstanceInformationStringFilter
+import aws.smithy.kotlin.runtime.ServiceException
 import aws.smithy.kotlin.runtime.auth.awscredentials.Credentials
 import io.github.jmanera.devopsmobiletools.plugin.AwsContext
+import io.github.jmanera.devopsmobiletools.plugin.IamPermission
+import io.github.jmanera.devopsmobiletools.plugin.PermissionDeniedException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -25,7 +28,10 @@ data class ManagedInstance(
 
 /** Where the plugin finds instances. One per [AwsContext]. */
 interface InstanceDirectory {
-    /** EC2 instances whose SSM Agent is online: the only ones a session can reach. */
+    /**
+     * EC2 instances whose SSM Agent is online: the only ones a session can
+     * reach. Throws [PermissionDeniedException] if the role may not list them.
+     */
     suspend fun onlineInstances(): List<ManagedInstance>
 
     /** The `Name` tag of every tagged instance in the region, by instance id. */
@@ -51,14 +57,14 @@ class SdkInstanceDirectory(private val context: AwsContext) : InstanceDirectory 
             val instances = mutableListOf<ManagedInstance>()
             var next: String? = null
             do {
-                val out = c.describeInstanceInformation {
+                val out = denied(DESCRIBE_INSTANCE_INFORMATION) { c.describeInstanceInformation {
                     filters = listOf(
                         InstanceInformationStringFilter { key = "PingStatus"; values = listOf("Online") },
                         // Leaves out on-premises servers (mi-…) registered with hybrid activations.
                         InstanceInformationStringFilter { key = "ResourceType"; values = listOf("EC2Instance") },
                     )
                     nextToken = next
-                }
+                } }
                 out.instanceInformationList.orEmpty().mapNotNullTo(instances) { i ->
                     i.instanceId?.let {
                         ManagedInstance(
@@ -98,5 +104,17 @@ class SdkInstanceDirectory(private val context: AwsContext) : InstanceDirectory 
             } while (next != null)
             names
         }
+    }
+
+    /** Turns an access-denied answer into [PermissionDeniedException] for [permission]. */
+    private inline fun <T> denied(permission: IamPermission, call: () -> T): T = try {
+        call()
+    } catch (e: ServiceException) {
+        if (e.sdkErrorMetadata.errorCode == "AccessDeniedException") throw PermissionDeniedException(permission, e)
+        throw e
+    }
+
+    private companion object {
+        val DESCRIBE_INSTANCE_INFORMATION = IamPermission("ssm:DescribeInstanceInformation")
     }
 }

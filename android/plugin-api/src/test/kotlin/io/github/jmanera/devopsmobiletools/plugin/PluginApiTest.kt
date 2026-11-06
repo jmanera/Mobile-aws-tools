@@ -19,11 +19,11 @@ class PluginApiTest {
 
     @Test
     fun compatibilityWhileMajorIsZero() {
-        assertTrue(isCompatible("0.1.0"))
-        assertTrue(isCompatible("0.1.7"))
-        assertTrue(isCompatible("0.1.0-alpha.1"))
-        assertFalse(isCompatible("0.2.0"))
-        assertFalse(isCompatible("0.0.9"))
+        assertTrue(isCompatible("0.2.0"))
+        assertTrue(isCompatible("0.2.7"))
+        assertTrue(isCompatible("0.2.0-alpha.1"))
+        assertFalse(isCompatible("0.3.0"))
+        assertFalse(isCompatible("0.1.0"))
         assertFalse(isCompatible("1.1.0"))
         assertFalse(isCompatible("0.1"))
         assertFalse(isCompatible(""))

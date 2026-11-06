@@ -19,6 +19,7 @@ import io.github.jmanera.devopsmobiletools.plugin.Target
 import io.github.jmanera.devopsmobiletools.plugin.TargetPlugin
 import io.github.jmanera.devopsmobiletools.plugin.TerminalConnection
 import io.github.jmanera.devopsmobiletools.plugins.ec2shell.Ec2ShellPlugin
+import io.github.jmanera.devopsmobiletools.session.PlainTextScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

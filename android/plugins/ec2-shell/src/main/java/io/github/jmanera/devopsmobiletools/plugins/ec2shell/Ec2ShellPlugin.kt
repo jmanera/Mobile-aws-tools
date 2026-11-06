@@ -36,7 +36,7 @@ class Ec2ShellPlugin(
     override val info = PluginInfo(
         id = "io.github.jmanera.devopsmobiletools.ec2shell",
         name = "EC2 shell",
-        version = "0.1.0",
+        version = "0.2.0",
     )
 
     override val permissions = PERMISSIONS
