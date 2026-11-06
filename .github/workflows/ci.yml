@@ -3,7 +3,11 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore: ["docs/**", "**.md"]
   pull_request:
+    paths-ignore: ["docs/**", "**.md"]
+  # Run by hand to get a debug APK; pushes and pull requests only lint and test.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -52,12 +56,20 @@ jobs:
           go install golang.org/x/mobile/cmd/gobind@latest
           gomobile init
       - name: Build bridge AAR
+        # Lint only needs the bridge's classes, so one ABI is enough unless an APK is wanted.
+        env:
+          TARGETS: ${{ github.event_name == 'workflow_dispatch' && 'android/arm64,android/amd64' || 'android/arm64' }}
         run: bridge/build-aar.sh
       - uses: gradle/actions/setup-gradle@v5
-      - name: Assemble debug APK
+      - name: Lint
         working-directory: android
-        run: ./gradlew assembleDebug lint
-      - uses: actions/upload-artifact@v6
+        run: ./gradlew lintDebug
+      - name: Assemble debug APK
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: android
+        run: ./gradlew assembleDebug
+      - if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v6
         with:
           name: app-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
