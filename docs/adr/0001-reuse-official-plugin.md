@@ -74,6 +74,14 @@ with our own package `ssmbridge`, compiled to an AAR with
   channel and reports `StateClosed`; nothing calls `os.Exit`.
 - `ResumeSession` and `TerminateSession` use an SSM client built with the
   static temporary credentials passed in, not the default chain.
+  `UpdateCredentials` replaces them when the role's credentials are
+  renewed (phase 4).
+- KMS-encrypted sessions get a KMS client with their own credentials:
+  `encryption.NewEncrypter`, an exported variable the data channel calls
+  during the encryption handshake, is replaced by one that finds the
+  session by the `aws:ssm:SessionId` of the encryption context. The client
+  the plugin builds from the default chain is discarded unused. No plugin
+  code is patched (phase 4, #52).
 - Writes and resizes are serialized with a mutex: the plugin's
   `SendInputDataMessage` increments the sequence number without locking.
 - A redacting logger implements `log.T` and strips `TokenValue`, the secret
@@ -85,14 +93,15 @@ The public API uses only types gomobile supports. Go `int` maps to Java
 
 ## Known limitations
 
-- **KMS-encrypted sessions read credentials from environment variables.**
-  The plugin builds its KMS client from the default config chain, so the
-  bridge sets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and
-  `AWS_SESSION_TOKEN` in the app process. Consequences: one set of
-  credentials per process (fine for the MVP, which has one session) and
-  credentials live in the process environment, which other processes of
-  the same UID could read. Fix before phase 4: propose an upstream change
-  to inject the KMS client, or carry a minimal patch.
+- ~~KMS-encrypted sessions read credentials from environment variables.~~
+  Resolved in phase 4 (#52), see the decision above. Until then the bridge
+  set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN`
+  in the app process, which allowed one set of credentials per process. The
+  plugin's discarded default chain still loads, so the bridge points
+  `AWS_CONFIG_FILE` and `AWS_SHARED_CREDENTIALS_FILE` at `/dev/null`;
+  nothing secret goes into the environment. The hook relies on
+  `encryption.NewEncrypter` staying an exported variable: check it when
+  bumping the plugin.
 - `src/datachannel` pulls `testify` into the binary through the plugin's
   mocks package. Harmless, adds size.
 - AAR size: 8.7 MB for arm64 + x86_64 with `-ldflags="-s -w"`.
