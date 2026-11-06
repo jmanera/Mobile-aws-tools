@@ -91,7 +91,11 @@ private fun AppNavigation(nav: NavHostController) {
         ) { entry ->
             val id = entry.arguments?.getString("id").orEmpty()
             val name = entry.arguments?.getString("name") ?: id
-            SessionScreen(Target(id, name), onBack = { nav.popBackStack() })
+            SessionScreen(
+                Target(id, name),
+                onBack = { nav.popBackStack() },
+                onChangeRole = { if (!nav.popBackStack(SIGN_IN, inclusive = false)) nav.navigate(SIGN_IN) },
+            )
         }
     }
 }

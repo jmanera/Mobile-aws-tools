@@ -3,6 +3,7 @@
 
 package io.github.jmanera.devopsmobiletools.session
 
+import io.github.jmanera.devopsmobiletools.errors.FailureAction
 import io.github.jmanera.devopsmobiletools.plugin.ConnectionState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -35,16 +36,28 @@ class ReconnectionTest {
         assertFalse(t.available(200))
     }
 
+    private fun end(state: ConnectionState, detail: String) = LiveSession.endFailure(state, detail)
+
     @Test
     fun endReasonsSayWhatToDo() {
-        assertEquals("Session closed", LiveSession.endReason(ConnectionState.CLOSED, "closed by user"))
-        assertTrue(LiveSession.endReason(ConnectionState.CLOSED, "the session no longer exists on AWS").contains("Reconnect starts a new one"))
-        assertTrue(LiveSession.endReason(ConnectionState.CLOSED, "session timed out").contains("idle timeout"))
-        assertEquals("The shell on the instance exited", LiveSession.endReason(ConnectionState.CLOSED, "session ended by the remote side"))
+        assertEquals("Session closed", end(ConnectionState.CLOSED, "closed by user").message)
+        assertTrue(end(ConnectionState.CLOSED, "the session no longer exists on AWS").message.contains("Reconnect starts a new one"))
+        assertTrue(end(ConnectionState.CLOSED, "session timed out").message.contains("idle timeout"))
+        assertTrue(end(ConnectionState.FAILED, "timed out waiting for the agent handshake").message.contains("handshake"))
+        assertEquals("The shell on the instance exited", end(ConnectionState.CLOSED, "session ended by the remote side").message)
         assertTrue(
-            LiveSession.endReason(ConnectionState.FAILED, "cannot resume session: dial tcp: network is unreachable")
-                .startsWith("The connection could not be resumed"),
+            end(ConnectionState.FAILED, "cannot resume session: dial tcp: network is unreachable")
+                .message.startsWith("The connection could not be resumed"),
         )
-        assertEquals("Session failed: boom", LiveSession.endReason(ConnectionState.FAILED, "boom"))
+        assertEquals("boom", end(ConnectionState.FAILED, "boom").message)
+    }
+
+    @Test
+    fun aResumeRefusedForPermissionsAsksToChangeRole() {
+        val f = end(
+            ConnectionState.FAILED,
+            "cannot resume session: api error AccessDeniedException: User: x is not authorized to perform: ssm:ResumeSession on resource: s",
+        )
+        assertEquals(FailureAction.CHANGE_ROLE, f.action)
     }
 }

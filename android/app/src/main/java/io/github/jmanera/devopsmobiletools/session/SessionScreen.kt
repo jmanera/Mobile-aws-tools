@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import io.github.jmanera.devopsmobiletools.DevOpsMobileToolsApp
+import io.github.jmanera.devopsmobiletools.errors.FailureAction
 import io.github.jmanera.devopsmobiletools.plugin.Target
 import io.github.jmanera.devopsmobiletools.terminal.createTerminalView
 
@@ -37,7 +38,7 @@ import io.github.jmanera.devopsmobiletools.terminal.createTerminalView
  * running in the background; Disconnect ends it.
  */
 @Composable
-fun SessionScreen(target: Target, onBack: () -> Unit) {
+fun SessionScreen(target: Target, onBack: () -> Unit, onChangeRole: () -> Unit) {
     val app = LocalContext.current.applicationContext as DevOpsMobileToolsApp
     val vm = remember(target.id) { app.sessions.open(target) }
     RequestNotificationPermission()
@@ -76,8 +77,13 @@ fun SessionScreen(target: Target, onBack: () -> Unit) {
                 onKey = vm::press,
                 onLock = vm::lock,
             )
-        } else Button(onClick = vm::connect, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-            Text("Reconnect")
+        } else {
+            val modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
+            when (vm.failure?.action) {
+                FailureAction.SIGN_IN -> Button(onClick = onChangeRole, modifier = modifier) { Text("Sign in again") }
+                FailureAction.CHANGE_ROLE -> Button(onClick = onChangeRole, modifier = modifier) { Text("Change role") }
+                else -> Button(onClick = vm::connect, modifier = modifier) { Text("Reconnect") }
+            }
         }
     }
 }
