@@ -9,6 +9,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.termux.terminal.TerminalTransport
 import io.github.jmanera.devopsmobiletools.DevOpsMobileToolsApp
+import io.github.jmanera.devopsmobiletools.errors.Failure
+import io.github.jmanera.devopsmobiletools.errors.FailureAction
+import io.github.jmanera.devopsmobiletools.errors.Failures
 import io.github.jmanera.devopsmobiletools.plugin.ConnectionListener
 import io.github.jmanera.devopsmobiletools.plugin.ConnectionState
 import io.github.jmanera.devopsmobiletools.plugin.Target
@@ -50,6 +53,10 @@ class LiveSession(
 
     /** The current terminal; a reconnection starts a new one. */
     var terminal by mutableStateOf<RemoteTerminal?>(null)
+        private set
+
+    /** Why the session ended and what to do; null while it is not ended. */
+    var failure by mutableStateOf<Failure?>(null)
         private set
 
     val ended: Boolean
@@ -112,9 +119,9 @@ class LiveSession(
                 keepCredentialsFresh(c)
             } catch (e: Exception) {
                 Log.w(TAG, "Connect failed: ${e.javaClass.simpleName}: ${e.message}")
-                val reason = e.message ?: e.javaClass.simpleName
-                show(ConnectionState.FAILED, reason)
-                t.onClosed("Could not start the session: $reason")
+                val f = Failures.of(e)
+                show(ConnectionState.FAILED, "", f)
+                t.onClosed("Could not start the session: ${f.message}")
             }
         }
     }
@@ -185,7 +192,7 @@ class LiveSession(
 
         override fun onStateChanged(state: ConnectionState, detail: String) {
             if (state == ConnectionState.CLOSED || state == ConnectionState.FAILED) {
-                t.onClosed(endReason(state, detail))
+                t.onClosed(endFailure(state, detail).message)
             }
             scope.launch {
                 if (terminal === t) show(state, detail)
@@ -193,14 +200,16 @@ class LiveSession(
         }
     }
 
-    private fun show(state: ConnectionState, detail: String) {
+    /** [failure] overrides what [detail] says, for errors raised before the bridge took over. */
+    private fun show(state: ConnectionState, detail: String, failure: Failure? = null) {
         this.state = state
         if (ended) connection = null
+        this.failure = if (ended) failure ?: endFailure(state, detail) else null
         status = when (state) {
             ConnectionState.CONNECTING -> "Starting session…"
             ConnectionState.CONNECTED -> "Connected · tap the terminal to type"
             ConnectionState.RECONNECTING -> "Connection lost · reconnecting…"
-            ConnectionState.CLOSED, ConnectionState.FAILED -> endReason(state, detail)
+            ConnectionState.CLOSED, ConnectionState.FAILED -> this.failure!!.message
         }
     }
 
@@ -208,16 +217,31 @@ class LiveSession(
         private const val TAG = "session"
         private const val CREDENTIALS_CHECK_MS = 2 * 60 * 1000L
 
-        /** Why a session ended, in words for the user, from the bridge's detail. */
-        fun endReason(state: ConnectionState, detail: String): String = when {
-            state == ConnectionState.CLOSED && detail == "closed by user" -> "Session closed"
-            detail.contains("no longer exists") || detail.contains("timed out") ->
-                "The session ended on AWS (idle timeout, or ended by an administrator). Reconnect starts a new one."
-            detail.contains("remote side") -> "The shell on the instance exited"
-            detail.startsWith("cannot resume session") ->
-                "The connection could not be resumed. Reconnect starts a new session."
-            state == ConnectionState.FAILED -> if (detail.isBlank()) "Session failed" else "Session failed: $detail"
-            else -> "Session closed"
+        /** Why a session ended and what to do, from the bridge's state and detail. */
+        fun endFailure(state: ConnectionState, detail: String): Failure = when {
+            state == ConnectionState.CLOSED && detail == "closed by user" -> Failure("Session closed", FailureAction.RETRY)
+            detail.contains("no longer exists") || detail.contains("timed out waiting for") -> ended(detail)
+            detail.contains("session timed out") -> ended(detail)
+            detail.contains("remote side") -> Failure("The shell on the instance exited", FailureAction.RETRY)
+            detail.startsWith(RESUME_FAILED) -> {
+                // Signed out or denied while resuming says so; anything else is the connection.
+                val cause = Failures.of(detail.removePrefix(RESUME_FAILED).trimStart(':', ' '))
+                if (cause.action != FailureAction.RETRY) cause
+                else Failure("The connection could not be resumed. Reconnect starts a new session.", FailureAction.RETRY)
+            }
+            state == ConnectionState.FAILED -> if (detail.isBlank()) Failure("Session failed", FailureAction.RETRY) else Failures.of(detail)
+            else -> Failure("Session closed", FailureAction.RETRY)
+        }
+
+        private const val RESUME_FAILED = "cannot resume session"
+
+        private fun ended(detail: String) = if (detail.contains("handshake")) {
+            Failure("The instance did not answer the session handshake. Reconnect to try again.", FailureAction.RETRY)
+        } else {
+            Failure(
+                "The session ended on AWS (idle timeout, or ended by an administrator). Reconnect starts a new one.",
+                FailureAction.RETRY,
+            )
         }
     }
 }

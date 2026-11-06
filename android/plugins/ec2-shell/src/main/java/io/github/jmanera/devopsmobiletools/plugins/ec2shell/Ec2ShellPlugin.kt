@@ -10,6 +10,7 @@ import io.github.jmanera.devopsmobiletools.plugin.Connection
 import io.github.jmanera.devopsmobiletools.plugin.ConnectionListener
 import io.github.jmanera.devopsmobiletools.plugin.ConnectionState
 import io.github.jmanera.devopsmobiletools.plugin.IamPermission
+import io.github.jmanera.devopsmobiletools.plugin.PermissionDeniedException
 import io.github.jmanera.devopsmobiletools.plugin.PluginInfo
 import io.github.jmanera.devopsmobiletools.plugin.Target
 import io.github.jmanera.devopsmobiletools.plugin.TargetPlugin
@@ -74,7 +75,13 @@ class Ec2ShellPlugin(
             cols = 80
             rows = 24
         }
-        val session = withContext(Dispatchers.IO) { Ssmbridge.startShell(cfg, BridgeListener(listener), LogcatSink) }
+        val session = withContext(Dispatchers.IO) {
+            try {
+                Ssmbridge.startShell(cfg, BridgeListener(listener), LogcatSink)
+            } catch (e: Exception) {
+                throw deniedPermission(e.message.orEmpty())?.let { PermissionDeniedException(it, e) } ?: e
+            }
+        }
         return ShellConnection(session)
     }
 
@@ -118,6 +125,17 @@ class Ec2ShellPlugin(
             IamPermission("ssm:DescribeInstanceInformation"),
             IamPermission("tag:GetResources"),
         )
+
+        /**
+         * The permission an AWS access-denied error names, as the bridge
+         * reports it ("not authorized to perform: ssm:StartSession on ..."),
+         * if it is one this plugin declares; null for any other error.
+         */
+        internal fun deniedPermission(message: String): IamPermission? {
+            if (!message.contains("AccessDenied")) return null
+            val action = Regex("""not authorized to perform: ([a-z0-9-]+:[A-Za-z0-9]+)""").find(message)?.groupValues?.get(1)
+            return PERMISSIONS.firstOrNull { it.action == action }
+        }
 
         const val ATTR_PLATFORM = "platform"
         const val ATTR_AGENT_VERSION = "agentVersion"

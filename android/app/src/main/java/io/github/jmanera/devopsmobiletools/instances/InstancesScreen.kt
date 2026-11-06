@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.jmanera.devopsmobiletools.DevOpsMobileToolsApp
+import io.github.jmanera.devopsmobiletools.errors.FailureAction
 import io.github.jmanera.devopsmobiletools.plugin.Target
 import io.github.jmanera.devopsmobiletools.plugins.ec2shell.Ec2ShellPlugin
 
@@ -62,10 +63,16 @@ fun InstancesScreen(
             }
 
             is InstancesState.Failed -> {
-                Text(state.message, color = MaterialTheme.colorScheme.error)
-                if (state.backToSignIn) {
-                    OutlinedButton(onClick = onChangeRole, modifier = Modifier.fillMaxWidth()) {
+                Text(state.failure.message, color = MaterialTheme.colorScheme.error)
+                when (state.failure.action) {
+                    FailureAction.SIGN_IN -> OutlinedButton(onClick = onChangeRole, modifier = Modifier.fillMaxWidth()) {
+                        Text("Sign in again")
+                    }
+                    FailureAction.CHANGE_ROLE -> OutlinedButton(onClick = onChangeRole, modifier = Modifier.fillMaxWidth()) {
                         Text("Back to account and role")
+                    }
+                    FailureAction.RETRY -> OutlinedButton(onClick = vm::refresh, modifier = Modifier.fillMaxWidth()) {
+                        Text("Try again")
                     }
                 }
             }

@@ -112,6 +112,20 @@ class Ec2ShellPluginTest {
         assertEquals(ConnectionState.FAILED, Ec2ShellPlugin.stateOf(99))
     }
 
+    @Test
+    fun accessDeniedOnStartSessionNamesThePermission() {
+        val message = "StartSession failed: operation error SSM: StartSession, api error AccessDeniedException: " +
+            "User: arn:aws:sts::1:assumed-role/R/u is not authorized to perform: ssm:StartSession on resource: i-1"
+        assertEquals("ssm:StartSession", Ec2ShellPlugin.deniedPermission(message)?.action)
+    }
+
+    @Test
+    fun otherErrorsAreNotPermissions() {
+        assertEquals(null, Ec2ShellPlugin.deniedPermission("api error TargetNotConnected: i-1 is not connected."))
+        // A permission the plugin does not declare is left to the caller.
+        assertEquals(null, Ec2ShellPlugin.deniedPermission("AccessDeniedException: not authorized to perform: ec2:RunInstances"))
+    }
+
     private class FakeDirectory : InstanceDirectory {
         var instances = emptyList<ManagedInstance>()
         var names = emptyMap<String, String>()

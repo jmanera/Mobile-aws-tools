@@ -11,11 +11,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.jmanera.devopsmobiletools.DevOpsMobileToolsApp
+import io.github.jmanera.devopsmobiletools.errors.Failure
+import io.github.jmanera.devopsmobiletools.errors.Failures
 import io.github.jmanera.devopsmobiletools.core.aws.context.Selection
-import io.github.jmanera.devopsmobiletools.core.aws.context.SelectionRequiredException
-import io.github.jmanera.devopsmobiletools.core.aws.sso.SignInRequiredException
-import io.github.jmanera.devopsmobiletools.plugin.PermissionDeniedException
 import io.github.jmanera.devopsmobiletools.plugin.Target
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -26,8 +26,7 @@ sealed interface InstancesState {
 
     data class Loaded(val targets: List<Target>) : InstancesState
 
-    /** [backToSignIn]: the problem is fixed on the sign-in screen (sign in, pick a role). */
-    data class Failed(val message: String, val backToSignIn: Boolean = false) : InstancesState
+    data class Failed(val failure: Failure) : InstancesState
 }
 
 /** The instances the EC2 shell plugin finds for the selected role and region. */
@@ -60,20 +59,12 @@ class InstancesViewModel(app: Application) : AndroidViewModel(app) {
                 selection = withContext(Dispatchers.IO) { aws.contexts.selection() }
                 val context = withContext(Dispatchers.IO) { aws.contexts.context() }
                 InstancesState.Loaded(aws.ec2Shell.discover(context))
-            } catch (e: SelectionRequiredException) {
-                InstancesState.Failed("Pick an account, a role and a region first.", backToSignIn = true)
-            } catch (e: SignInRequiredException) {
-                InstancesState.Failed("Please sign in again: ${e.message}", backToSignIn = true)
-            } catch (e: PermissionDeniedException) {
-                InstancesState.Failed(
-                    "This role cannot list instances. Add ${e.permission.action} to its permission set " +
-                        "in IAM Identity Center, or pick another role.",
-                    backToSignIn = true,
-                )
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 // SDK messages name the failing operation, never the credentials.
                 Log.w(TAG, "Discovery failed: ${e.javaClass.simpleName}: ${e.message}")
-                InstancesState.Failed(e.message ?: e.javaClass.simpleName)
+                InstancesState.Failed(Failures.of(e))
             }
         }
     }
