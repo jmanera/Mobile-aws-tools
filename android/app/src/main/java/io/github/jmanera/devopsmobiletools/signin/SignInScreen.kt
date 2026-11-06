@@ -43,7 +43,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun SignInScreen(vm: SignInViewModel = viewModel()) {
+fun SignInScreen(onShowInstances: () -> Unit, vm: SignInViewModel = viewModel()) {
     val context = LocalContext.current
     val openBrowser: (String) -> Unit = { url ->
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -100,7 +100,7 @@ fun SignInScreen(vm: SignInViewModel = viewModel()) {
                     OutlinedButton(onClick = vm::refreshNow, modifier = Modifier.fillMaxWidth()) { Text("Refresh now") }
                 }
                 OutlinedButton(onClick = vm::signOut, modifier = Modifier.fillMaxWidth()) { Text("Sign out") }
-                PickerSection(vm)
+                PickerSection(vm, onShowInstances)
             }
         }
     }
@@ -109,7 +109,7 @@ fun SignInScreen(vm: SignInViewModel = viewModel()) {
 private val TIME = DateTimeFormatter.ofPattern("HH:mm")
 
 @Composable
-private fun PickerSection(vm: SignInViewModel) {
+private fun PickerSection(vm: SignInViewModel, onShowInstances: () -> Unit) {
     val p = vm.picker
     Text("Work as", style = MaterialTheme.typography.titleMedium)
     if (p.loading && p.roles.isEmpty()) Text("Loading your accounts and roles…")
@@ -150,6 +150,9 @@ private fun PickerSection(vm: SignInViewModel) {
             "Working as ${active.role.roleName} in ${active.role.accountName}, ${active.region}. " +
                 "Credentials ${p.keyHint}, valid until $time and renewed automatically.",
         )
+        if (!p.canApply) {
+            Button(onClick = onShowInstances, modifier = Modifier.fillMaxWidth()) { Text("Show instances") }
+        }
     }
     p.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 }

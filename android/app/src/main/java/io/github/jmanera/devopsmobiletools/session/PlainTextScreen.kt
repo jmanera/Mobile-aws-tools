@@ -1,14 +1,14 @@
 // Copyright 2026 The DevOps Mobile Tools Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package io.github.jmanera.devopsmobiletools.spike
+package io.github.jmanera.devopsmobiletools.session
 
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.charset.CodingErrorAction
 
 /**
- * Throw-away stand-in for a terminal emulator: decodes UTF-8 across chunk
+ * Stand-in for a terminal emulator until phase 3: decodes UTF-8 across chunk
  * boundaries, drops ANSI escape sequences and handles CR, LF and backspace.
  * Good enough to see a prompt and run `uname -a`; full-screen programs need
  * the real emulator from phase 3.

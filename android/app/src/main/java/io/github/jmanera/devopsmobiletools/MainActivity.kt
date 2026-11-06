@@ -3,6 +3,7 @@
 
 package io.github.jmanera.devopsmobiletools
 
+import android.net.Uri
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -10,11 +11,20 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import io.github.jmanera.devopsmobiletools.instances.InstancesScreen
+import io.github.jmanera.devopsmobiletools.plugin.Target
+import io.github.jmanera.devopsmobiletools.session.SessionScreen
 import io.github.jmanera.devopsmobiletools.signin.SignInScreen
 import io.github.jmanera.devopsmobiletools.ui.BrandTheme
 
-/** Entry point of the app: sign-in with IAM Identity Center. */
+/** Entry point of the app: sign-in, then instances, then a session. */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -23,8 +33,36 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             BrandTheme {
-                Surface(Modifier.fillMaxSize()) { SignInScreen() }
+                Surface(Modifier.fillMaxSize()) { AppNavigation() }
             }
         }
     }
 }
+
+@Composable
+private fun AppNavigation() {
+    val nav = rememberNavController()
+    NavHost(nav, startDestination = SIGN_IN) {
+        composable(SIGN_IN) {
+            SignInScreen(onShowInstances = { nav.navigate(INSTANCES) })
+        }
+        composable(INSTANCES) {
+            InstancesScreen(
+                onOpen = { t -> nav.navigate("$SESSION/${Uri.encode(t.id)}?name=${Uri.encode(t.name)}") },
+                onChangeRole = { if (!nav.popBackStack(SIGN_IN, inclusive = false)) nav.navigate(SIGN_IN) },
+            )
+        }
+        composable(
+            "$SESSION/{id}?name={name}",
+            arguments = listOf(navArgument("id") { type = NavType.StringType }, navArgument("name") { nullable = true }),
+        ) { entry ->
+            val id = entry.arguments?.getString("id").orEmpty()
+            val name = entry.arguments?.getString("name") ?: id
+            SessionScreen(Target(id, name), onBack = { nav.popBackStack() })
+        }
+    }
+}
+
+private const val SIGN_IN = "signin"
+private const val INSTANCES = "instances"
+private const val SESSION = "session"
