@@ -41,8 +41,7 @@ android {
 dependencies {
     implementation(project(":core-aws"))
     implementation(project(":terminal"))
-    // The phase 0 spike (manual credentials, src/debug) talks to the bridge directly.
-    debugImplementation(project(":bridge"))
+    implementation(project(":plugins:ec2-shell"))
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
