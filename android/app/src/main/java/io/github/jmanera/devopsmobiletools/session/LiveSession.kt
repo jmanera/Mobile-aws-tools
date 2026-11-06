@@ -17,7 +17,9 @@ import io.github.jmanera.devopsmobiletools.terminal.ExtraKey
 import io.github.jmanera.devopsmobiletools.terminal.Modifier
 import io.github.jmanera.devopsmobiletools.terminal.RemoteTerminal
 import io.github.jmanera.devopsmobiletools.terminal.StickyModifiers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -107,6 +109,7 @@ class LiveSession(
                 }
                 connection = c
                 applySize(c)
+                keepCredentialsFresh(c)
             } catch (e: Exception) {
                 Log.w(TAG, "Connect failed: ${e.javaClass.simpleName}: ${e.message}")
                 val reason = e.message ?: e.javaClass.simpleName
@@ -122,6 +125,40 @@ class LiveSession(
     }
 
     fun lock(modifier: Modifier) = modifiers.lock(modifier)
+
+    /** The device's network came back or changed; see [SessionManager]. */
+    fun networkChanged() {
+        val c = connection ?: return
+        scope.launch(Dispatchers.IO) { runCatching { c.networkChanged() } }
+    }
+
+    /**
+     * Hands [c] the role's renewed credentials while it is open, so it can
+     * still resume after the first ones expire. The provider renews them
+     * five minutes before expiry; checking every two minutes catches that.
+     */
+    private fun keepCredentialsFresh(c: TerminalConnection) {
+        scope.launch(Dispatchers.IO) {
+            var sent: String? = runCatching { aws.contexts.context().credentials.accessKeyId }.getOrNull()
+            while (connection === c) {
+                delay(CREDENTIALS_CHECK_MS)
+                if (connection !== c) break
+                try {
+                    val creds = aws.contexts.context().credentials
+                    if (creds.accessKeyId != sent) {
+                        c.updateCredentials(creds)
+                        sent = creds.accessKeyId
+                        Log.i(TAG, "Renewed credentials handed to ${target.id}: $creds")
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Signed out or offline: the session keeps its credentials until they expire.
+                    Log.w(TAG, "Cannot renew credentials: ${e.javaClass.simpleName}: ${e.message}")
+                }
+            }
+        }
+    }
 
     fun disconnect() {
         closing = true
@@ -148,7 +185,7 @@ class LiveSession(
 
         override fun onStateChanged(state: ConnectionState, detail: String) {
             if (state == ConnectionState.CLOSED || state == ConnectionState.FAILED) {
-                t.onClosed(if (state == ConnectionState.CLOSED) "Session closed" else "Session failed: $detail")
+                t.onClosed(endReason(state, detail))
             }
             scope.launch {
                 if (terminal === t) show(state, detail)
@@ -159,17 +196,28 @@ class LiveSession(
     private fun show(state: ConnectionState, detail: String) {
         this.state = state
         if (ended) connection = null
-        val name = when (state) {
+        status = when (state) {
             ConnectionState.CONNECTING -> "Starting session…"
             ConnectionState.CONNECTED -> "Connected · tap the terminal to type"
-            ConnectionState.RECONNECTING -> "Reconnecting…"
-            ConnectionState.CLOSED -> "Session closed"
-            ConnectionState.FAILED -> "Session failed"
+            ConnectionState.RECONNECTING -> "Connection lost · reconnecting…"
+            ConnectionState.CLOSED, ConnectionState.FAILED -> endReason(state, detail)
         }
-        status = if (detail.isBlank()) name else "$name: $detail"
     }
 
-    private companion object {
-        const val TAG = "session"
+    internal companion object {
+        private const val TAG = "session"
+        private const val CREDENTIALS_CHECK_MS = 2 * 60 * 1000L
+
+        /** Why a session ended, in words for the user, from the bridge's detail. */
+        fun endReason(state: ConnectionState, detail: String): String = when {
+            state == ConnectionState.CLOSED && detail == "closed by user" -> "Session closed"
+            detail.contains("no longer exists") || detail.contains("timed out") ->
+                "The session ended on AWS (idle timeout, or ended by an administrator). Reconnect starts a new one."
+            detail.contains("remote side") -> "The shell on the instance exited"
+            detail.startsWith("cannot resume session") ->
+                "The connection could not be resumed. Reconnect starts a new session."
+            state == ConnectionState.FAILED -> if (detail.isBlank()) "Session failed" else "Session failed: $detail"
+            else -> "Session closed"
+        }
     }
 }

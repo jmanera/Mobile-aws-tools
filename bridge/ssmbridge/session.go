@@ -20,6 +20,7 @@ import (
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/aws/session-manager-plugin/src/config"
 	"github.com/aws/session-manager-plugin/src/datachannel"
 	pluginlog "github.com/aws/session-manager-plugin/src/log"
@@ -39,6 +40,17 @@ const (
 
 // sessionTypeTimeout bounds the wait for the agent's handshake.
 const sessionTypeTimeout = 30 * time.Second
+
+// After the connection drops, the session keeps trying to resume for
+// resumeWindow, waiting between attempts from resumeMinDelay up to
+// resumeMaxDelay. The plugin's own retryer gives up after about three
+// seconds, too soon for a phone changing networks or leaving a tunnel.
+// SSM's idle session timeout (20 minutes by default) ends it anyway.
+const (
+	resumeWindow   = 10 * time.Minute
+	resumeMinDelay = time.Second
+	resumeMaxDelay = 15 * time.Second
+)
 
 // Listener receives terminal output and lifecycle events. Calls come from
 // Go goroutines, never from the Android main thread.
@@ -80,20 +92,47 @@ type Session struct {
 	listener Listener
 	log      *redactingLogger
 	dc       *datachannel.DataChannel
+
+	credsMu  sync.Mutex // guards ssm and awsCreds, replaced by UpdateCredentials
 	ssm      *ssm.Client
 	awsCreds aws.Credentials
 
 	sendMu sync.Mutex // the plugin's SendInputDataMessage is not goroutine-safe
 
-	mu     sync.Mutex
-	ready  bool
-	cols   uint32
-	rows   uint32
-	state  int
-	closed bool
+	mu       sync.Mutex
+	ready    bool
+	cols     uint32
+	rows     uint32
+	state    int
+	closed   bool
+	resuming bool
+
+	// wake cuts short the wait between resume attempts (NetworkChanged).
+	wake chan struct{}
+	// resumeFn is s.resume; tests replace it.
+	resumeFn func() error
+	// Resume timings; constants above, shorter in tests.
+	resumeWindow, resumeMinDelay, resumeMaxDelay time.Duration
 
 	done      chan struct{}
 	closeOnce sync.Once
+}
+
+func newSession(c Config, listener Listener, sink LogSink) *Session {
+	s := &Session{
+		cfg:            c,
+		listener:       listener,
+		log:            newLogger(sink, c.LogLevel),
+		cols:           uint32(c.Cols),
+		rows:           uint32(c.Rows),
+		wake:           make(chan struct{}, 1),
+		resumeWindow:   resumeWindow,
+		resumeMinDelay: resumeMinDelay,
+		resumeMaxDelay: resumeMaxDelay,
+		done:           make(chan struct{}),
+	}
+	s.resumeFn = s.resume
+	return s
 }
 
 // processCredsMu guards the process environment. The plugin builds its KMS
@@ -116,14 +155,7 @@ func Connect(cfg *Config, listener Listener, sink LogSink) (*Session, error) {
 		return nil, err
 	}
 
-	s := &Session{
-		cfg:      c,
-		listener: listener,
-		log:      newLogger(sink, c.LogLevel),
-		cols:     uint32(c.Cols),
-		rows:     uint32(c.Rows),
-		done:     make(chan struct{}),
-	}
+	s := newSession(c, listener, sink)
 	s.log.addSecrets(c.TokenValue, c.SecretAccessKey, c.SessionToken)
 	s.awsCreds = aws.Credentials{
 		AccessKeyID:     c.AccessKeyID,
@@ -170,18 +202,8 @@ func (s *Session) open() error {
 	}
 
 	dc.GetWsChannel().SetOnError(func(err error) {
-		if s.isClosed() {
-			return
-		}
 		log.Warnf("Data channel error, resuming session: %v", err)
-		s.setState(StateReconnecting, err.Error())
-		r := newRetryer()
-		r.CallableFunc = s.resume
-		if err := r.Call(); err != nil {
-			s.fail(fmt.Errorf("cannot resume session: %w", err))
-			return
-		}
-		s.setState(StateConnected, "resumed")
+		s.startResume(err.Error())
 	})
 
 	if err := dc.ResendStreamDataMessageScheduler(log); err != nil {
@@ -253,11 +275,123 @@ func (s *Session) watchResendTimeout() {
 	}
 }
 
+// startResume reports StateReconnecting and resumes in the background,
+// unless a resume is already running, which it wakes instead.
+func (s *Session) startResume(reason string) {
+	s.mu.Lock()
+	if s.closed || s.resuming {
+		s.mu.Unlock()
+		s.poke()
+		return
+	}
+	s.resuming = true
+	s.mu.Unlock()
+	s.setState(StateReconnecting, s.log.redact(reason))
+	go s.resumeLoop()
+}
+
+// resumeLoop retries resumeFn with growing pauses until it works, the
+// session is gone, the window runs out or the session is closed.
+func (s *Session) resumeLoop() {
+	defer func() {
+		s.mu.Lock()
+		s.resuming = false
+		s.mu.Unlock()
+	}()
+	deadline := time.Now().Add(s.resumeWindow)
+	delay := s.resumeMinDelay
+	for {
+		err := s.resumeFn()
+		if s.isClosed() {
+			return
+		}
+		if err == nil {
+			s.setState(StateConnected, "resumed")
+			return
+		}
+		var gone *types.DoesNotExistException
+		if errors.As(err, &gone) {
+			s.shutdown(StateClosed, "the session no longer exists on AWS")
+			return
+		}
+		if !time.Now().Before(deadline) {
+			s.fail(fmt.Errorf("cannot resume session: %w", err))
+			return
+		}
+		s.log.Warnf("Resume failed, retrying in %v: %v", delay, err)
+		select {
+		case <-time.After(delay):
+		case <-s.wake:
+		case <-s.done:
+			return
+		}
+		if delay *= 2; delay > s.resumeMaxDelay {
+			delay = s.resumeMaxDelay
+		}
+	}
+}
+
+// poke wakes a resume waiting for its next attempt.
+func (s *Session) poke() {
+	select {
+	case s.wake <- struct{}{}:
+	default:
+	}
+}
+
+// NetworkChanged tells the session the device's network came back or
+// changed. A session waiting to resume tries again at once; a connected one
+// resumes on the new network, since its socket may be dead without knowing.
+func (s *Session) NetworkChanged() {
+	s.mu.Lock()
+	closed, resuming, ready := s.closed, s.resuming, s.ready
+	s.mu.Unlock()
+	switch {
+	case closed:
+	case resuming:
+		s.poke()
+	case ready:
+		s.startResume("network changed")
+	}
+}
+
+// UpdateCredentials replaces the temporary credentials used to resume and
+// terminate the session and to sign new WebSocket connections. Call it when
+// the role's credentials are renewed, so a session can still resume after
+// the first ones expire.
+func (s *Session) UpdateCredentials(accessKeyID, secretAccessKey, sessionToken string) error {
+	if accessKeyID == "" || secretAccessKey == "" || sessionToken == "" {
+		return errors.New("accessKeyID, secretAccessKey and sessionToken are required")
+	}
+	s.log.addSecrets(secretAccessKey, sessionToken)
+	s.credsMu.Lock()
+	s.awsCreds = aws.Credentials{
+		AccessKeyID:     accessKeyID,
+		SecretAccessKey: secretAccessKey,
+		SessionToken:    sessionToken,
+		Source:          "ssmbridge",
+	}
+	s.ssm = newSSMClient(s.cfg.Region, accessKeyID, secretAccessKey, sessionToken)
+	s.credsMu.Unlock()
+	c := s.cfg
+	c.AccessKeyID, c.SecretAccessKey, c.SessionToken = accessKeyID, secretAccessKey, sessionToken
+	exposeCredentialsToPlugin(c)
+	return nil
+}
+
+// credentials returns the current SSM client and credentials.
+func (s *Session) credentials() (*ssm.Client, aws.Credentials) {
+	s.credsMu.Lock()
+	defer s.credsMu.Unlock()
+	return s.ssm, s.awsCreds
+}
+
 // resume asks SSM for a fresh token and reconnects the data channel.
 func (s *Session) resume() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	out, err := s.ssm.ResumeSession(ctx, &ssm.ResumeSessionInput{SessionId: aws.String(s.cfg.SessionID)})
+	client, creds := s.credentials()
+	out, err := client.ResumeSession(ctx, &ssm.ResumeSessionInput{SessionId: aws.String(s.cfg.SessionID)})
 	if err != nil {
 		return err
 	}
@@ -268,7 +402,7 @@ func (s *Session) resume() error {
 	s.log.addSecrets(*out.TokenValue)
 	ws := s.dc.GetWsChannel()
 	ws.SetChannelToken(*out.TokenValue)
-	ws.SetCredentials(s.awsCreds)
+	ws.SetCredentials(creds)
 	if out.StreamUrl != nil && *out.StreamUrl != "" {
 		if err := validateStreamURL(*out.StreamUrl); err != nil {
 			return err
@@ -340,7 +474,8 @@ func (s *Session) State() int {
 func (s *Session) terminate() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if _, err := s.ssm.TerminateSession(ctx, &ssm.TerminateSessionInput{SessionId: aws.String(s.cfg.SessionID)}); err != nil {
+	client, _ := s.credentials()
+	if _, err := client.TerminateSession(ctx, &ssm.TerminateSessionInput{SessionId: aws.String(s.cfg.SessionID)}); err != nil {
 		s.log.Warnf("TerminateSession failed: %v", err)
 	}
 }

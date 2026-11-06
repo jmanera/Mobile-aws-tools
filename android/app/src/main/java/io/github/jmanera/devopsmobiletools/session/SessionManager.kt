@@ -9,6 +9,7 @@ import io.github.jmanera.devopsmobiletools.plugin.Target
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * The sessions of the whole process, one per target. While any is live,
@@ -18,6 +19,10 @@ import kotlinx.coroutines.SupervisorJob
 class SessionManager(private val aws: DevOpsMobileToolsApp) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    private val networks = NetworkWatcher(aws) {
+        scope.launch { live.forEach(LiveSession::networkChanged) }
+    }
 
     /** Open sessions, ended ones included until dismissed, so their terminal can be read. */
     val sessions = mutableStateListOf<LiveSession>()
@@ -31,6 +36,7 @@ class SessionManager(private val aws: DevOpsMobileToolsApp) {
         sessions.firstOrNull { it.target.id == target.id }?.let { return it }
         return LiveSession(aws, target, scope).also {
             sessions += it
+            networks.start()
             SessionService.start(aws)
         }
     }
