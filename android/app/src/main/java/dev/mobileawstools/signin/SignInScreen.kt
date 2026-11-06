@@ -61,6 +61,8 @@ fun SignInScreen(vm: SignInViewModel = viewModel()) {
                 Button(onClick = { vm.signIn(openBrowser) }, modifier = Modifier.fillMaxWidth()) { Text("Sign in") }
             }
 
+            SignInState.Restoring -> Text("Checking the saved sign-in…")
+
             SignInState.Starting -> Text("Contacting IAM Identity Center…")
 
             is SignInState.WaitingForUser -> {
@@ -76,6 +78,10 @@ fun SignInScreen(vm: SignInViewModel = viewModel()) {
                 val time = TIME.format(state.expiresAt.atZone(ZoneId.systemDefault()))
                 Text("Signed in. The token expires at $time.")
                 Text(if (state.refreshable) "It can be refreshed without signing in again." else "No refresh token was granted.")
+                if (state.refreshable) {
+                    OutlinedButton(onClick = vm::refreshNow, modifier = Modifier.fillMaxWidth()) { Text("Refresh now") }
+                }
+                OutlinedButton(onClick = vm::signOut, modifier = Modifier.fillMaxWidth()) { Text("Sign out") }
             }
         }
     }

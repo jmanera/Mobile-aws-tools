@@ -6,6 +6,7 @@ package dev.mobileawstools.core.aws.sso
 import aws.sdk.kotlin.services.ssooidc.SsoOidcClient
 import aws.sdk.kotlin.services.ssooidc.model.AccessDeniedException
 import aws.sdk.kotlin.services.ssooidc.model.AuthorizationPendingException
+import aws.sdk.kotlin.services.ssooidc.model.CreateTokenRequest
 import aws.sdk.kotlin.services.ssooidc.model.ExpiredTokenException
 import aws.sdk.kotlin.services.ssooidc.model.InvalidGrantException
 import aws.sdk.kotlin.services.ssooidc.model.SlowDownException
@@ -57,13 +58,27 @@ class SdkSsoOidc(private val region: String) : SsoOidc {
         } }
 
     override suspend fun pollToken(registration: ClientRegistration, deviceCode: String): TokenPoll =
-        io { client().use { c ->
+        createToken(registration) {
+            grantType = DEVICE_CODE_GRANT
+            this.deviceCode = deviceCode
+        }
+
+    override suspend fun refreshToken(registration: ClientRegistration, refreshToken: String): TokenPoll =
+        createToken(registration) {
+            grantType = REFRESH_TOKEN_GRANT
+            this.refreshToken = refreshToken
+        }
+
+    private suspend fun createToken(
+        registration: ClientRegistration,
+        grant: CreateTokenRequest.Builder.() -> Unit,
+    ): TokenPoll = io {
+        client().use { c ->
             try {
                 val out = c.createToken {
                     clientId = registration.clientId
                     clientSecret = registration.clientSecret
-                    grantType = DEVICE_CODE_GRANT
-                    this.deviceCode = deviceCode
+                    grant()
                 }
                 TokenPoll.Granted(
                     accessToken = requireNotNull(out.accessToken) { "CreateToken returned no accessToken" },
@@ -85,7 +100,8 @@ class SdkSsoOidc(private val region: String) : SsoOidc {
             } catch (e: IOException) {
                 TokenPoll.Unreachable(e.message ?: e.javaClass.simpleName)
             }
-        } }
+        }
+    }
 
     private fun client() = SsoOidcClient { region = this@SdkSsoOidc.region }
 
@@ -93,5 +109,6 @@ class SdkSsoOidc(private val region: String) : SsoOidc {
 
     private companion object {
         const val DEVICE_CODE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"
+        const val REFRESH_TOKEN_GRANT = "refresh_token"
     }
 }

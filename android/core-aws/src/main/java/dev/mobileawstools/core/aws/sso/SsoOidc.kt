@@ -14,6 +14,9 @@ interface SsoOidc {
 
     /** One CreateToken call with the device code grant. */
     suspend fun pollToken(registration: ClientRegistration, deviceCode: String): TokenPoll
+
+    /** CreateToken with the refresh token grant: [TokenPoll.Granted], [TokenPoll.Denied], [TokenPoll.Expired] or [TokenPoll.Unreachable]. */
+    suspend fun refreshToken(registration: ClientRegistration, refreshToken: String): TokenPoll
 }
 
 /** Keeps client registrations between sign-ins, one per region. */
@@ -23,7 +26,7 @@ interface ClientRegistrationStore {
     fun save(region: String, registration: ClientRegistration)
 }
 
-/** Keeps registrations for the life of the process. Encrypted storage arrives with #17. */
+/** Keeps registrations for the life of the process; for tests. */
 class InMemoryClientRegistrationStore : ClientRegistrationStore {
     private val registrations = mutableMapOf<String, ClientRegistration>()
 
