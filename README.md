@@ -59,10 +59,11 @@ bridge/build-aar.sh                 # writes android/bridge/libs/ssmbridge.aar
 cd android && ./gradlew assembleDebug
 ```
 
-Run the bridge tests:
+Run the tests:
 
 ```sh
 cd bridge && go test ./...
+cd android && ./gradlew testDebugUnitTest :plugin-api:test
 ```
 
 ## Trying the spike
