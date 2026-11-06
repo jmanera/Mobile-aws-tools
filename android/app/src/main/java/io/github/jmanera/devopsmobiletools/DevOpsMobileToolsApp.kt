@@ -14,6 +14,7 @@ import io.github.jmanera.devopsmobiletools.core.aws.sso.SdkSsoPortal
 import io.github.jmanera.devopsmobiletools.core.aws.sso.SsoSession
 import io.github.jmanera.devopsmobiletools.core.aws.store.KeystoreSecretBox
 import io.github.jmanera.devopsmobiletools.plugins.ec2shell.Ec2ShellPlugin
+import io.github.jmanera.devopsmobiletools.lock.AppLock
 import io.github.jmanera.devopsmobiletools.session.SessionManager
 import java.io.File
 
@@ -46,6 +47,14 @@ class DevOpsMobileToolsApp : Application() {
 
     /** Open sessions; they outlive screens, kept alive by SessionService. */
     val sessions by lazy { SessionManager(this) }
+
+    /** Biometric lock over the whole app. */
+    val lock by lazy { AppLock(this) }
+
+    override fun onCreate() {
+        super.onCreate()
+        lock.start()
+    }
 
     private companion object {
         const val KEY_ALIAS = "sso-store"
