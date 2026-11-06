@@ -11,16 +11,23 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import dev.mobileawstools.core.aws.sso.InMemoryClientRegistrationStore
+import dev.mobileawstools.core.aws.sso.EncryptedClientRegistrationStore
+import dev.mobileawstools.core.aws.sso.EncryptedSsoTokenStore
 import dev.mobileawstools.core.aws.sso.SdkSsoOidc
+import dev.mobileawstools.core.aws.sso.SignInRequiredException
 import dev.mobileawstools.core.aws.sso.SsoLogin
+import dev.mobileawstools.core.aws.sso.SsoSession
 import dev.mobileawstools.core.aws.sso.SsoToken
+import dev.mobileawstools.core.aws.store.KeystoreSecretBox
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Instant
 
 sealed interface SignInState {
     data object Idle : SignInState
+    data object Restoring : SignInState
     data object Starting : SignInState
     data class WaitingForUser(val userCode: String, val verificationUri: String) : SignInState
     data class SignedIn(val expiresAt: Instant, val refreshable: Boolean) : SignInState
@@ -44,12 +51,32 @@ class SignInViewModel(app: Application) : AndroidViewModel(app) {
             stateHolder.value = value
         }
 
-    /** Held in memory only until encrypted storage lands (#17). */
-    private var token: SsoToken? = null
+    // Sealed with a Keystore key, in noBackupFilesDir: never in clear, never in a backup.
+    private val box = KeystoreSecretBox(KEY_ALIAS)
+    private val registrations = EncryptedClientRegistrationStore(app.noBackupFilesDir, box)
+    private val session = SsoSession(
+        tokens = EncryptedSsoTokenStore(app.noBackupFilesDir, box),
+        registrations = registrations,
+        oidcFor = ::SdkSsoOidc,
+    )
     private var job: Job? = null
 
+    init {
+        restore()
+    }
+
+    /** Picks up a token saved by an earlier run, refreshing it if it is about to expire. */
+    private fun restore() = launchJob {
+        state = SignInState.Restoring
+        val saved = withContext(Dispatchers.IO) { session.current() }
+        if (saved == null) {
+            state = SignInState.Idle
+            return@launchJob
+        }
+        show(withContext(Dispatchers.IO) { session.validToken() })
+    }
+
     fun signIn(openBrowser: (String) -> Unit) {
-        if (job?.isActive == true) return
         val url = startUrl.trim()
         val ssoRegion = region.trim()
         val login = try {
@@ -59,27 +86,52 @@ class SignInViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         prefs.edit().putString(KEY_START_URL, url).putString(KEY_REGION, ssoRegion).apply()
-        state = SignInState.Starting
+        launchJob {
+            state = SignInState.Starting
+            val (registration, authorization) = login.start()
+            state = SignInState.WaitingForUser(authorization.userCode, authorization.verificationUriComplete)
+            openBrowser(authorization.verificationUriComplete)
+            val token = login.awaitToken(registration, authorization)
+            withContext(Dispatchers.IO) { session.signedIn(token) }
+            show(token)
+        }
+    }
+
+    /** Uses the refresh token now, without waiting for the token to near its expiry. */
+    fun refreshNow() = launchJob {
+        show(withContext(Dispatchers.IO) { session.refresh() })
+    }
+
+    fun signOut() {
+        job?.cancel()
+        session.signOut()
+        state = SignInState.Idle
+    }
+
+    fun cancel() {
+        job?.cancel()
+        state = SignInState.Idle
+    }
+
+    private fun show(token: SsoToken) {
+        Log.i(TAG, "Token: $token")
+        state = SignInState.SignedIn(token.expiresAt, token.refreshToken != null)
+    }
+
+    private fun launchJob(block: suspend () -> Unit) {
+        if (job?.isActive == true) return
         job = viewModelScope.launch {
             try {
-                val (registration, authorization) = login.start()
-                state = SignInState.WaitingForUser(authorization.userCode, authorization.verificationUriComplete)
-                openBrowser(authorization.verificationUriComplete)
-                val signedIn = login.awaitToken(registration, authorization)
-                token = signedIn
-                state = SignInState.SignedIn(signedIn.expiresAt, signedIn.refreshToken != null)
-                Log.i(TAG, "Signed in: $signedIn")
+                block()
+            } catch (e: SignInRequiredException) {
+                Log.i(TAG, "Sign-in required: ${e.message}")
+                state = SignInState.Failed("Please sign in again: ${e.message}")
             } catch (e: Exception) {
                 // SDK messages name the failing operation, never the tokens.
                 Log.w(TAG, "Sign-in failed: ${e.javaClass.simpleName}: ${e.message}")
                 state = SignInState.Failed(e.message ?: e.javaClass.simpleName)
             }
         }
-    }
-
-    fun cancel() {
-        job?.cancel()
-        state = SignInState.Idle
     }
 
     override fun onCleared() {
@@ -90,8 +142,6 @@ class SignInViewModel(app: Application) : AndroidViewModel(app) {
         const val TAG = "signin"
         const val KEY_START_URL = "start_url"
         const val KEY_REGION = "region"
-
-        // Survives the screen, not the process; persisted encrypted in #17.
-        val registrations = InMemoryClientRegistrationStore()
+        const val KEY_ALIAS = "sso-store"
     }
 }

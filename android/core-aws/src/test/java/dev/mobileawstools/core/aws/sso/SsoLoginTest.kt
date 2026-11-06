@@ -152,5 +152,8 @@ class SsoLoginTest {
             assertSame(store.load("eu-west-3"), registration)
             return polls.removeFirstOrNull() ?: TokenPoll.Pending
         }
+
+        override suspend fun refreshToken(registration: ClientRegistration, refreshToken: String) =
+            error("not used by SsoLogin")
     }
 }
