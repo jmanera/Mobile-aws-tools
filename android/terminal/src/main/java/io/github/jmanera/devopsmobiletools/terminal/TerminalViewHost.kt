@@ -17,19 +17,20 @@ import com.termux.view.TerminalViewClient
 
 /**
  * Creates a [TerminalView] ready for a [RemoteTerminal]: JetBrains Mono,
- * keyboard on tap, the on-screen keyboard without suggestions, and Ctrl and
- * Alt from the extra-keys row applied to what is typed.
+ * keyboard on tap, the on-screen keyboard without suggestions, Ctrl and Alt
+ * from the extra-keys row applied to what is typed, and pinch to change the
+ * text size, reported to [onTextSizeChanged] so it can be remembered.
  */
 fun createTerminalView(
     context: Context,
     modifiers: StickyModifiers,
-    textSizeSp: Float = DEFAULT_TEXT_SIZE_SP,
+    textSizeSp: Float = TextSizes.DEFAULT_SP,
+    onTextSizeChanged: (Float) -> Unit = {},
 ): TerminalView {
     val view = TerminalView(context, null)
-    view.setTerminalViewClient(ViewClient(view, modifiers))
-    view.setTextSize(
-        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, textSizeSp, context.resources.displayMetrics).toInt(),
-    )
+    val initial = TextSizes.clamp(textSizeSp)
+    view.setTerminalViewClient(ViewClient(view, modifiers, initial, onTextSizeChanged))
+    view.setTextSize(spToPx(context, initial))
     // The system monospace font varies by device and some barely tell i, l and 1 apart.
     view.setTypeface(context.resources.getFont(R.font.jetbrains_mono_nl_regular))
     view.setBackgroundColor(TerminalColors.COLOR_SCHEME.mDefaultColors[TextStyle.COLOR_INDEX_BACKGROUND])
@@ -38,7 +39,20 @@ fun createTerminalView(
     return view
 }
 
-const val DEFAULT_TEXT_SIZE_SP = 12f
+/** Terminal text sizes in sp: what a pinch moves between. */
+object TextSizes {
+    const val DEFAULT_SP = 12f
+    const val MIN_SP = 6f
+    const val MAX_SP = 32f
+
+    fun clamp(sp: Float) = sp.coerceIn(MIN_SP, MAX_SP)
+
+    /** One step larger or smaller, within the limits. */
+    fun step(sp: Float, larger: Boolean) = clamp(if (larger) sp + 1f else sp - 1f)
+}
+
+private fun spToPx(context: Context, sp: Float) =
+    TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, context.resources.displayMetrics).toInt()
 
 /** Shows the on-screen keyboard for [view]. */
 fun TerminalView.showKeyboard() {
@@ -49,9 +63,25 @@ fun TerminalView.showKeyboard() {
 private class ViewClient(
     private val view: TerminalView,
     private val modifiers: StickyModifiers,
+    private var textSizeSp: Float,
+    private val onTextSizeChanged: (Float) -> Unit,
 ) : TerminalViewClient {
 
-    override fun onScale(scale: Float): Float = 1f
+    /**
+     * [scale] accumulates over a pinch; each 10% changes the text by one
+     * step and starts over, as in Termux. The new size reflows the emulator
+     * and resizes the remote terminal.
+     */
+    override fun onScale(scale: Float): Float {
+        if (scale > 0.9f && scale < 1.1f) return scale
+        val next = TextSizes.step(textSizeSp, larger = scale > 1f)
+        if (next != textSizeSp) {
+            textSizeSp = next
+            view.setTextSize(spToPx(view.context, next))
+            onTextSizeChanged(next)
+        }
+        return 1f
+    }
 
     override fun onSingleTapUp(e: MotionEvent) = view.showKeyboard()
 
