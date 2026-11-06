@@ -78,13 +78,15 @@ class Ec2ShellPlugin : TargetPlugin {
     companion object {
         private const val TAG = "ssmbridge"
 
-        /** What ssm:StartSession and the data channel need; DescribeInstanceInformation comes with discovery. */
+        /**
+         * What the client side of a shell session needs. The ssmmessages
+         * actions belong to the SSM Agent's instance role, not to the user;
+         * DescribeInstanceInformation comes with discovery in phase 2.
+         */
         val PERMISSIONS = listOf(
             IamPermission("ssm:StartSession"),
             IamPermission("ssm:ResumeSession"),
             IamPermission("ssm:TerminateSession"),
-            IamPermission("ssmmessages:CreateDataChannel"),
-            IamPermission("ssmmessages:OpenDataChannel"),
         )
 
         // The bridge's State and Level values are compile-time constants, so

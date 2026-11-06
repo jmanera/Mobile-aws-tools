@@ -21,8 +21,7 @@ class Ec2ShellPluginTest {
     @Test
     fun declaresTheSessionManagerPermissions() {
         val actions = plugin.permissions.map { it.action }.toSet()
-        assertTrue(actions.containsAll(setOf("ssm:StartSession", "ssm:ResumeSession", "ssm:TerminateSession")))
-        assertTrue(actions.all { it.startsWith("ssm:") || it.startsWith("ssmmessages:") })
+        assertEquals(setOf("ssm:StartSession", "ssm:ResumeSession", "ssm:TerminateSession"), actions)
     }
 
     @Test
