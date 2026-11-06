@@ -3,7 +3,11 @@
 
 package io.github.jmanera.devopsmobiletools.session
 
-import android.app.Application
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,19 +21,26 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.jmanera.devopsmobiletools.DevOpsMobileToolsApp
 import io.github.jmanera.devopsmobiletools.plugin.Target
 import io.github.jmanera.devopsmobiletools.terminal.createTerminalView
 
+/**
+ * The session on [target], opened if there is none. Going back keeps it
+ * running in the background; Disconnect ends it.
+ */
 @Composable
 fun SessionScreen(target: Target, onBack: () -> Unit) {
-    val app = LocalContext.current.applicationContext as Application
-    val vm: SessionViewModel = viewModel(key = target.id) { SessionViewModel(app, target) }
+    val app = LocalContext.current.applicationContext as DevOpsMobileToolsApp
+    val vm = remember(target.id) { app.sessions.open(target) }
+    RequestNotificationPermission()
 
     Column(
         Modifier.fillMaxSize().safeDrawingPadding().imePadding(),
@@ -41,6 +52,9 @@ fun SessionScreen(target: Target, onBack: () -> Unit) {
                 Text(vm.status, style = MaterialTheme.typography.labelMedium)
             }
             if (vm.ended) TextButton(onClick = vm::connect) { Text("Reconnect") }
+            TextButton(onClick = { app.sessions.close(vm); onBack() }) {
+                Text(if (vm.ended) "Close" else "Disconnect")
+            }
             TextButton(onClick = onBack) { Text("Instances") }
         }
 
@@ -65,5 +79,20 @@ fun SessionScreen(target: Target, onBack: () -> Unit) {
         } else Button(onClick = vm::connect, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
             Text("Reconnect")
         }
+    }
+}
+
+/**
+ * Asks once for notifications (Android 13+), so the notification of open
+ * sessions is visible. Sessions stay alive without it; it only hides them.
+ */
+@Composable
+private fun RequestNotificationPermission() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    LaunchedEffect(Unit) {
+        val granted = context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (!granted) launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }

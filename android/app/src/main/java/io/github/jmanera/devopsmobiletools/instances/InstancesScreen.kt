@@ -23,8 +23,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.jmanera.devopsmobiletools.DevOpsMobileToolsApp
 import io.github.jmanera.devopsmobiletools.plugin.Target
 import io.github.jmanera.devopsmobiletools.plugins.ec2shell.Ec2ShellPlugin
 
@@ -85,8 +87,12 @@ fun InstancesScreen(
                 )
                 val visible = vm.visible
                 if (visible.isEmpty()) Text("No instance matches “${vm.query.trim()}”.")
+                val sessions = (LocalContext.current.applicationContext as DevOpsMobileToolsApp).sessions
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(visible, key = { it.id }) { InstanceCard(it, onOpen) }
+                    items(visible, key = { it.id }) { t ->
+                        val session = sessions.sessions.firstOrNull { it.target.id == t.id }
+                        InstanceCard(t, session?.let { if (it.ended) "Session ended" else "Session open" }, onOpen)
+                    }
                 }
             }
         }
@@ -94,10 +100,15 @@ fun InstancesScreen(
 }
 
 @Composable
-private fun InstanceCard(target: Target, onOpen: (Target) -> Unit) {
+private fun InstanceCard(target: Target, sessionLabel: String?, onOpen: (Target) -> Unit) {
     Card(Modifier.fillMaxWidth().clickable { onOpen(target) }) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(target.name, style = MaterialTheme.typography.titleMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(target.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                sessionLabel?.let {
+                    Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                }
+            }
             val details = listOfNotNull(
                 target.id.takeIf { it != target.name },
                 target.attributes[Ec2ShellPlugin.ATTR_PLATFORM],

@@ -14,9 +14,10 @@ import io.github.jmanera.devopsmobiletools.core.aws.sso.SdkSsoPortal
 import io.github.jmanera.devopsmobiletools.core.aws.sso.SsoSession
 import io.github.jmanera.devopsmobiletools.core.aws.store.KeystoreSecretBox
 import io.github.jmanera.devopsmobiletools.plugins.ec2shell.Ec2ShellPlugin
+import io.github.jmanera.devopsmobiletools.session.SessionManager
 import java.io.File
 
-/** Holds what every screen shares: the SSO session, the picked role and region, their credentials, the plugins. */
+/** Holds what every screen shares: the SSO session, the picked role and region, their credentials, the plugins, the open sessions. */
 class DevOpsMobileToolsApp : Application() {
 
     // Sealed with a Keystore key, in noBackupFilesDir: never in clear, never in a backup.
@@ -42,6 +43,9 @@ class DevOpsMobileToolsApp : Application() {
 
     /** The built-in EC2 shell, the only plugin until the marketplace of phase 6. */
     val ec2Shell by lazy { Ec2ShellPlugin() }
+
+    /** Open sessions; they outlive screens, kept alive by SessionService. */
+    val sessions by lazy { SessionManager(this) }
 
     private companion object {
         const val KEY_ALIAS = "sso-store"
