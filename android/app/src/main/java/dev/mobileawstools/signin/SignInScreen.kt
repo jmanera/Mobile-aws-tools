@@ -82,9 +82,30 @@ fun SignInScreen(vm: SignInViewModel = viewModel()) {
                     OutlinedButton(onClick = vm::refreshNow, modifier = Modifier.fillMaxWidth()) { Text("Refresh now") }
                 }
                 OutlinedButton(onClick = vm::signOut, modifier = Modifier.fillMaxWidth()) { Text("Sign out") }
+                RolesSection(vm)
             }
         }
     }
 }
 
 private val TIME = DateTimeFormatter.ofPattern("HH:mm")
+
+@Composable
+private fun RolesSection(vm: SignInViewModel) {
+    val roles = vm.roles
+    Text("Roles", style = MaterialTheme.typography.titleMedium)
+    if (roles.roles.isEmpty()) {
+        Button(onClick = vm::loadRoles, modifier = Modifier.fillMaxWidth()) { Text("Load my accounts and roles") }
+    }
+    for (role in roles.roles) {
+        OutlinedButton(onClick = { vm.credentialsFor(role) }, modifier = Modifier.fillMaxWidth()) {
+            Text("${role.accountName} (${role.accountId}) · ${role.roleName}")
+        }
+    }
+    val selected = roles.selected
+    if (selected != null && roles.expiresAt != null) {
+        val time = TIME.format(roles.expiresAt.atZone(ZoneId.systemDefault()))
+        Text("Credentials for ${selected.roleName}: key ${roles.keyHint}, valid until $time.")
+    }
+    roles.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+}

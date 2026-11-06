@@ -13,9 +13,12 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mobileawstools.core.aws.sso.EncryptedClientRegistrationStore
 import dev.mobileawstools.core.aws.sso.EncryptedSsoTokenStore
+import dev.mobileawstools.core.aws.sso.RoleCredentialsProvider
 import dev.mobileawstools.core.aws.sso.SdkSsoOidc
+import dev.mobileawstools.core.aws.sso.SdkSsoPortal
 import dev.mobileawstools.core.aws.sso.SignInRequiredException
 import dev.mobileawstools.core.aws.sso.SsoLogin
+import dev.mobileawstools.core.aws.sso.SsoRole
 import dev.mobileawstools.core.aws.sso.SsoSession
 import dev.mobileawstools.core.aws.sso.SsoToken
 import dev.mobileawstools.core.aws.store.KeystoreSecretBox
@@ -33,6 +36,16 @@ sealed interface SignInState {
     data class SignedIn(val expiresAt: Instant, val refreshable: Boolean) : SignInState
     data class Failed(val message: String) : SignInState
 }
+
+/** What the signed-in screen shows below the token: roles, then credentials for one. */
+data class RolesState(
+    val roles: List<SsoRole> = emptyList(),
+    val selected: SsoRole? = null,
+    /** Shown instead of the key: enough to tell credentials apart, nothing usable. */
+    val keyHint: String? = null,
+    val expiresAt: Instant? = null,
+    val error: String? = null,
+)
 
 class SignInViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -59,7 +72,11 @@ class SignInViewModel(app: Application) : AndroidViewModel(app) {
         registrations = registrations,
         oidcFor = ::SdkSsoOidc,
     )
+    private val credentials = RoleCredentialsProvider(session, ::SdkSsoPortal)
     private var job: Job? = null
+
+    var roles by mutableStateOf(RolesState())
+        private set
 
     init {
         restore()
@@ -105,7 +122,39 @@ class SignInViewModel(app: Application) : AndroidViewModel(app) {
     fun signOut() {
         job?.cancel()
         session.signOut()
+        roles = RolesState()
+        viewModelScope.launch { credentials.clear() }
         state = SignInState.Idle
+    }
+
+    fun loadRoles() = launchRoles {
+        roles = RolesState(roles = withContext(Dispatchers.IO) { credentials.roles() })
+    }
+
+    /** Gets credentials for [role]; asking again within their lifetime returns the cached ones. */
+    fun credentialsFor(role: SsoRole) = launchRoles {
+        val creds = withContext(Dispatchers.IO) { credentials.credentials(role) }
+        Log.i(TAG, "Credentials for ${role.accountId}/${role.roleName}: $creds")
+        roles = roles.copy(
+            selected = role,
+            keyHint = "…" + creds.accessKeyId.takeLast(4),
+            expiresAt = creds.expiresAt,
+            error = null,
+        )
+    }
+
+    private fun launchRoles(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (e: SignInRequiredException) {
+                session.signOut()
+                state = SignInState.Failed("Please sign in again: ${e.message}")
+            } catch (e: Exception) {
+                Log.w(TAG, "Roles failed: ${e.javaClass.simpleName}: ${e.message}")
+                roles = roles.copy(error = e.message ?: e.javaClass.simpleName)
+            }
+        }
     }
 
     fun cancel() {
