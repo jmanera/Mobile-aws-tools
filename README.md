@@ -35,6 +35,7 @@ Why, and what had to change, is recorded in
 | `bridge/cmd/ssmshell` | Desktop harness to test the bridge against a real instance |
 | `android/app` | The app (Jetpack Compose); debug builds also ship the phase 0 spike |
 | `android/plugin-api` | Contract for target plugins (pure Kotlin) |
+| `android/plugins/ec2-shell` | Built-in plugin: EC2 shell through Session Manager |
 | `android/core-aws` | SSO sign-in, token storage and role credentials |
 | `android/terminal` | Terminal emulator view (phase 3) |
 | `android/bridge` | Exposes the gomobile AAR to the other modules |
