@@ -143,12 +143,15 @@ permission sets to AWS accounts.
        },
        {
          "Effect": "Allow",
-         "Action": ["ssm:DescribeInstanceInformation", "ssm:DescribeSessions", "ec2:DescribeInstances"],
+         "Action": ["ssm:DescribeInstanceInformation", "ssm:DescribeSessions", "tag:GetResources"],
          "Resource": "*"
        }
      ]
    }
    ```
+
+   `tag:GetResources` only reads the `Name` tag of each instance; without it
+   instances are listed by id.
 
 2. Assign the user to the account with that permission set.
 3. In the app, enter the **AWS access portal URL** and the Identity Center

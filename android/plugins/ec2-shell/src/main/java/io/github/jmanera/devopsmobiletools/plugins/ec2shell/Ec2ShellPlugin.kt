@@ -17,7 +17,10 @@ import io.github.jmanera.devopsmobiletools.ssmbridge.Listener
 import io.github.jmanera.devopsmobiletools.ssmbridge.LogSink
 import io.github.jmanera.devopsmobiletools.ssmbridge.Session
 import io.github.jmanera.devopsmobiletools.ssmbridge.Ssmbridge
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 
 /**
@@ -26,7 +29,9 @@ import kotlinx.coroutines.withContext
  * Built in rather than installed, but written against plugin-api like any
  * other plugin so the contract is exercised from phase 1.
  */
-class Ec2ShellPlugin : TargetPlugin {
+class Ec2ShellPlugin(
+    private val directoryFor: (AwsContext) -> InstanceDirectory = ::SdkInstanceDirectory,
+) : TargetPlugin {
 
     override val info = PluginInfo(
         id = "io.github.jmanera.devopsmobiletools.ec2shell",
@@ -36,8 +41,26 @@ class Ec2ShellPlugin : TargetPlugin {
 
     override val permissions = PERMISSIONS
 
-    /** Listing managed instances arrives in phase 2; until then targets are entered by id. */
-    override suspend fun discover(context: AwsContext): List<Target> = emptyList()
+    /**
+     * EC2 instances with the SSM Agent online, named after their `Name` tag
+     * and sorted by name. Without `tag:GetResources` they are listed by id.
+     */
+    override suspend fun discover(context: AwsContext): List<Target> = coroutineScope {
+        val directory = directoryFor(context)
+        val names = async {
+            try {
+                directory.nameTags()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Names are a convenience; a role without the permission still lists instances.
+                Log.w(TAG, "No Name tags: ${e.javaClass.simpleName}: ${e.message}")
+                emptyMap()
+            }
+        }
+        val instances = directory.onlineInstances()
+        targetsOf(instances, names.await())
+    }
 
     override suspend fun connect(target: Target, context: AwsContext, listener: ConnectionListener): Connection {
         val cfg = Ssmbridge.newConfig().apply {
@@ -80,14 +103,35 @@ class Ec2ShellPlugin : TargetPlugin {
 
         /**
          * What the client side of a shell session needs. The ssmmessages
-         * actions belong to the SSM Agent's instance role, not to the user;
-         * DescribeInstanceInformation comes with discovery in phase 2.
+         * actions belong to the SSM Agent's instance role, not to the user.
          */
         val PERMISSIONS = listOf(
             IamPermission("ssm:StartSession"),
             IamPermission("ssm:ResumeSession"),
             IamPermission("ssm:TerminateSession"),
+            IamPermission("ssm:DescribeInstanceInformation"),
+            IamPermission("tag:GetResources"),
         )
+
+        const val ATTR_PLATFORM = "platform"
+        const val ATTR_AGENT_VERSION = "agentVersion"
+        const val ATTR_IP_ADDRESS = "ipAddress"
+
+        internal fun targetsOf(instances: List<ManagedInstance>, names: Map<String, String>): List<Target> =
+            instances
+                .distinctBy { it.id }
+                .map { i ->
+                    Target(
+                        id = i.id,
+                        name = names[i.id]?.takeIf { it.isNotBlank() } ?: i.id,
+                        attributes = buildMap {
+                            i.platform?.let { put(ATTR_PLATFORM, it) }
+                            i.agentVersion?.let { put(ATTR_AGENT_VERSION, it) }
+                            i.ipAddress?.let { put(ATTR_IP_ADDRESS, it) }
+                        },
+                    )
+                }
+                .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, Target::name).thenBy(Target::id))
 
         // The bridge's State and Level values are compile-time constants, so
         // these mappings do not load its native library (unit tests rely on it).

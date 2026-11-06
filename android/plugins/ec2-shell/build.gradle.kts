@@ -15,14 +15,21 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    // android.util.Log returns defaults in unit tests instead of throwing.
+    testOptions.unitTests.isReturnDefaultValues = true
 }
 
 dependencies {
     api(project(":plugin-api"))
     implementation(project(":bridge"))
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.aws.ssm)
+    // Name tags; much smaller than the EC2 SDK.
+    implementation(libs.aws.resourcegroupstaggingapi)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
 
 kotlin {
