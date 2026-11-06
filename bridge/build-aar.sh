@@ -22,6 +22,6 @@ gomobile bind \
   -o "$OUT" \
   ./ssmbridge
 
-mkdir -p ../android/app/libs
-cp "$OUT" ../android/app/libs/ssmbridge.aar
+mkdir -p ../android/bridge/libs
+cp "$OUT" ../android/bridge/libs/ssmbridge.aar
 ls -lh "$OUT"

@@ -101,7 +101,7 @@ class SpikeViewModel : ViewModel() {
      * Loads the credentials JSON from a file in the app's private storage and
      * deletes it, so long tokens do not have to be typed through `adb shell input`:
      *
-     *     aws sts get-session-token | adb shell "run-as dev.mobileawstools.spike sh -c 'umask 077; mkdir -p files; cat > files/credentials.json'"
+     *     aws sts get-session-token | adb shell "run-as dev.mobileawstools.debug sh -c 'umask 077; mkdir -p files; cat > files/credentials.json'"
      */
     fun loadCredentials(file: File) {
         if (!file.exists()) {

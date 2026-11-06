@@ -14,7 +14,7 @@ captures/
 *.jks
 
 # Generated bridge library
-android/app/libs/*.aar
+android/bridge/libs/*.aar
 bridge/build/
 
 # Go

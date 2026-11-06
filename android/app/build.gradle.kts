@@ -1,22 +1,26 @@
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
 }
 
 android {
-    namespace = "dev.mobileawstools.spike"
+    namespace = "dev.mobileawstools"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "dev.mobileawstools.spike"
+        applicationId = "dev.mobileawstools"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
-        versionName = "0.0.1-spike"
+        versionName = "0.1.0"
     }
 
     buildTypes {
+        debug {
+            // Lets a debug build sit next to a release build on the same device.
+            applicationIdSuffix = ".debug"
+        }
         release {
             isMinifyEnabled = false
         }
@@ -35,13 +39,17 @@ android {
 }
 
 dependencies {
-    // Built by bridge/build-aar.sh; not committed.
-    implementation(files("libs/ssmbridge.aar"))
+    implementation(project(":core-aws"))
+    implementation(project(":terminal"))
+    // The phase 0 spike (manual credentials, src/debug) talks to the bridge directly.
+    debugImplementation(project(":bridge"))
 
-    implementation(platform("androidx.compose:compose-bom:2024.12.01"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.activity:activity-compose:1.9.3")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    implementation("androidx.core:core-ktx:1.15.0")
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.core.ktx)
+
+    testImplementation(libs.junit)
 }
