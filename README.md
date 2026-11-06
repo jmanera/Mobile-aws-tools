@@ -157,11 +157,12 @@ permission sets to AWS accounts.
 3. In the app, enter the **AWS access portal URL** and the Identity Center
    region (both in *Settings summary* on the Identity Center dashboard) and tap
    *Sign in*. Approve the code in the browser, then return to the app.
-4. *Load my accounts and roles* and tap the role: the app shows when its
-   temporary credentials expire. They are renewed automatically, and the SSO
+4. Pick the account, the role and the region, and tap *Use this role and
+   region*: the app shows when its temporary credentials expire, and
+   remembers the choice for the next start. They are renewed automatically, and the SSO
    token is refreshed without signing in again.
-5. In debug builds, open *SSM Spike (debug)*, enter the region and instance id
-   and tap *Start session with the signed-in role*.
+5. In debug builds, open *SSM Spike (debug)*, enter the instance id and tap
+   *Start session with the selected role and region*.
 
 The SSO token and the client registration are stored encrypted with a key in
 Android Keystore and are excluded from backups; role credentials stay in

@@ -12,8 +12,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.jmanera.devopsmobiletools.DevOpsMobileToolsApp
+import io.github.jmanera.devopsmobiletools.core.aws.context.AwsRegions
+import io.github.jmanera.devopsmobiletools.core.aws.context.Selection
 import io.github.jmanera.devopsmobiletools.core.aws.sso.SdkSsoOidc
 import io.github.jmanera.devopsmobiletools.core.aws.sso.SignInRequiredException
+import io.github.jmanera.devopsmobiletools.core.aws.sso.SsoAccount
 import io.github.jmanera.devopsmobiletools.core.aws.sso.SsoLogin
 import io.github.jmanera.devopsmobiletools.core.aws.sso.SsoRole
 import io.github.jmanera.devopsmobiletools.core.aws.sso.SsoToken
@@ -32,15 +35,33 @@ sealed interface SignInState {
     data class Failed(val message: String) : SignInState
 }
 
-/** What the signed-in screen shows below the token: roles, then credentials for one. */
-data class RolesState(
+/**
+ * The account, role and region picker below the token. [account], [role]
+ * and [region] are what the pickers show; [active] is the saved selection
+ * that plugins act with, once its credentials were obtained.
+ */
+data class PickerState(
+    val loading: Boolean = false,
     val roles: List<SsoRole> = emptyList(),
-    val selected: SsoRole? = null,
+    val account: SsoAccount? = null,
+    val role: SsoRole? = null,
+    val region: String,
+    val active: Selection? = null,
     /** Shown instead of the key: enough to tell credentials apart, nothing usable. */
     val keyHint: String? = null,
     val expiresAt: Instant? = null,
     val error: String? = null,
-)
+) {
+    val accounts: List<SsoAccount>
+        get() = roles.map { SsoAccount(it.accountId, it.accountName) }.distinct()
+
+    val accountRoles: List<SsoRole>
+        get() = roles.filter { it.accountId == account?.id }
+
+    /** The pickers show something other than the active selection. */
+    val canApply: Boolean
+        get() = role != null && Selection(role, region) != active
+}
 
 class SignInViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -63,9 +84,10 @@ class SignInViewModel(app: Application) : AndroidViewModel(app) {
     private val registrations = aws.registrations
     private val session = aws.session
     private val credentials = aws.credentials
+    private val contexts = aws.contexts
     private var job: Job? = null
 
-    var roles by mutableStateOf(RolesState())
+    var picker by mutableStateOf(emptyPicker())
         private set
 
     init {
@@ -112,42 +134,93 @@ class SignInViewModel(app: Application) : AndroidViewModel(app) {
     fun signOut() {
         job?.cancel()
         session.signOut()
-        roles = RolesState()
-        aws.selectedRole = null
+        // The saved selection stays: signing in to the same portal brings it back.
+        picker = emptyPicker()
         viewModelScope.launch { credentials.clear() }
         state = SignInState.Idle
     }
 
-    fun loadRoles() = launchRoles {
-        roles = RolesState(roles = withContext(Dispatchers.IO) { credentials.roles() })
+    /**
+     * Lists the roles assigned to the user and puts the pickers on the saved
+     * selection, if that role is still assigned. With nothing saved, a lone
+     * account or role is picked for the user.
+     */
+    fun loadRoles() = launchPicker {
+        picker = picker.copy(loading = true, error = null)
+        val roles = withContext(Dispatchers.IO) { credentials.roles() }
+        val saved = withContext(Dispatchers.IO) { contexts.selection() }
+        picker = when {
+            saved != null && saved.role in roles -> picker.copy(
+                roles = roles,
+                account = SsoAccount(saved.role.accountId, saved.role.accountName),
+                role = saved.role,
+                region = saved.region,
+            )
+            else -> {
+                val base = picker.copy(roles = roles)
+                val single = base.accounts.singleOrNull()
+                base.copy(
+                    account = single,
+                    role = single?.let { a -> roles.filter { it.accountId == a.id }.singleOrNull() },
+                    error = saved?.let { "${it.role.roleName} in ${it.role.accountName} is no longer assigned to you" },
+                )
+            }
+        }
+        if (saved != null && saved.role in roles) activate(saved)
     }
 
-    /** Gets credentials for [role]; asking again within their lifetime returns the cached ones. */
-    fun credentialsFor(role: SsoRole) = launchRoles {
-        val creds = withContext(Dispatchers.IO) { credentials.credentials(role) }
-        Log.i(TAG, "Credentials for ${role.accountId}/${role.roleName}: $creds")
-        aws.selectedRole = role
-        roles = roles.copy(
-            selected = role,
-            keyHint = "…" + creds.accessKeyId.takeLast(4),
-            expiresAt = creds.expiresAt,
+    fun pickAccount(account: SsoAccount) {
+        val roles = picker.roles.filter { it.accountId == account.id }
+        picker = picker.copy(account = account, role = roles.singleOrNull(), error = null)
+    }
+
+    fun pickRole(role: SsoRole) {
+        picker = picker.copy(role = role, error = null)
+    }
+
+    fun pickRegion(region: String) {
+        picker = picker.copy(region = region, error = null)
+    }
+
+    /** Saves what the pickers show as the selection, and gets credentials for it. */
+    fun apply() = launchPicker {
+        val role = picker.role ?: return@launchPicker
+        val selection = Selection(role, picker.region)
+        withContext(Dispatchers.IO) { contexts.select(selection) }
+        activate(selection)
+    }
+
+    /** Credentials for the saved [selection]; asking again within their lifetime returns the cached ones. */
+    private suspend fun activate(selection: Selection) {
+        val context = withContext(Dispatchers.IO) { contexts.context() }
+        Log.i(TAG, "Credentials for ${selection.role.accountId}/${selection.role.roleName} in ${context.region}: ${context.credentials}")
+        picker = picker.copy(
+            active = selection,
+            keyHint = "…" + context.credentials.accessKeyId.takeLast(4),
+            expiresAt = context.credentials.expiresAt,
             error = null,
         )
     }
 
-    private fun launchRoles(block: suspend () -> Unit) {
+    private fun launchPicker(block: suspend () -> Unit) {
         viewModelScope.launch {
             try {
                 block()
             } catch (e: SignInRequiredException) {
                 session.signOut()
+                picker = emptyPicker()
                 state = SignInState.Failed("Please sign in again: ${e.message}")
             } catch (e: Exception) {
-                Log.w(TAG, "Roles failed: ${e.javaClass.simpleName}: ${e.message}")
-                roles = roles.copy(error = e.message ?: e.javaClass.simpleName)
+                Log.w(TAG, "Picker failed: ${e.javaClass.simpleName}: ${e.message}")
+                picker = picker.copy(error = e.message ?: e.javaClass.simpleName)
+            } finally {
+                picker = picker.copy(loading = false)
             }
         }
     }
+
+    /** Before anything is picked, plugins act in the Identity Center region, if it is in the list. */
+    private fun emptyPicker() = PickerState(region = AwsRegions.of(region.trim())?.code ?: DEFAULT_REGION)
 
     fun cancel() {
         job?.cancel()
@@ -157,6 +230,7 @@ class SignInViewModel(app: Application) : AndroidViewModel(app) {
     private fun show(token: SsoToken) {
         Log.i(TAG, "Token: $token")
         state = SignInState.SignedIn(token.expiresAt, token.refreshToken != null)
+        if (picker.roles.isEmpty() && !picker.loading) loadRoles()
     }
 
     private fun launchJob(block: suspend () -> Unit) {
@@ -183,5 +257,6 @@ class SignInViewModel(app: Application) : AndroidViewModel(app) {
         const val TAG = "signin"
         const val KEY_START_URL = "start_url"
         const val KEY_REGION = "region"
+        const val DEFAULT_REGION = "eu-west-1"
     }
 }

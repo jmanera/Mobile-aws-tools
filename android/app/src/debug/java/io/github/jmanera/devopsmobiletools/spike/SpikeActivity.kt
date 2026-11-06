@@ -93,7 +93,7 @@ private fun ConnectForm(vm: SpikeViewModel) {
             modifier = Modifier.fillMaxWidth()) { Text("Load credentials file") }
         Button(onClick = vm::connect, modifier = Modifier.fillMaxWidth()) { Text("Start session") }
         Button(onClick = vm::connectWithSignedInRole, modifier = Modifier.fillMaxWidth()) {
-            Text("Start session with the signed-in role")
+            Text("Start session with the selected role and region")
         }
         if (vm.output.isNotEmpty()) {
             Text(vm.output.takeLast(2000), fontFamily = FontFamily.Monospace, fontSize = 12.sp)
