@@ -4,9 +4,10 @@ An open-source Android client for **AWS Systems Manager Session Manager**:
 sign in with IAM Identity Center, pick an EC2 instance and get an interactive
 shell from your phone, with no SSH keys and no inbound ports.
 
-> **Status: phase 0 (spike).** The repository currently proves that the
-> official Session Manager plugin can run inside an Android app. It is not
-> usable as a daily tool yet. See the [roadmap](#roadmap).
+> **Status: phase 1 (foundation and sign-in).** The app signs in with IAM
+> Identity Center, keeps the token encrypted and gets temporary role
+> credentials; a debug screen opens a shell with them. It is not usable as a
+> daily tool yet. See the [roadmap](#roadmap).
 
 ## How it works
 
@@ -100,6 +101,58 @@ cd android && ./gradlew testDebugUnitTest :plugin-api:test
 
 The spike shows output as plain text; a real terminal emulator arrives in
 phase 3. Never use long-lived IAM user keys with it.
+
+## Signing in with IAM Identity Center
+
+The app signs in with the OAuth device flow and gets temporary credentials
+for a role you are assigned to. Identity Center must be an **organization
+instance** (enabled with AWS Organizations): account instances cannot assign
+permission sets to AWS accounts.
+
+1. In IAM Identity Center, create a user, and a permission set with only what
+   a shell needs (replace the region and account id). The
+   `SSM-SessionManagerRunShell` document lives in your account, so its ARN
+   carries the account id, unlike AWS-owned documents:
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": "ssm:StartSession",
+         "Resource": [
+           "arn:aws:ec2:eu-west-1:123456789012:instance/*",
+           "arn:aws:ssm:eu-west-1:123456789012:document/SSM-SessionManagerRunShell"
+         ]
+       },
+       {
+         "Effect": "Allow",
+         "Action": ["ssm:TerminateSession", "ssm:ResumeSession"],
+         "Resource": "arn:aws:ssm:eu-west-1:123456789012:session/*"
+       },
+       {
+         "Effect": "Allow",
+         "Action": ["ssm:DescribeInstanceInformation", "ssm:DescribeSessions", "ec2:DescribeInstances"],
+         "Resource": "*"
+       }
+     ]
+   }
+   ```
+
+2. Assign the user to the account with that permission set.
+3. In the app, enter the **AWS access portal URL** and the Identity Center
+   region (both in *Settings summary* on the Identity Center dashboard) and tap
+   *Sign in*. Approve the code in the browser, then return to the app.
+4. *Load my accounts and roles* and tap the role: the app shows when its
+   temporary credentials expire. They are renewed automatically, and the SSO
+   token is refreshed without signing in again.
+5. In debug builds, open *SSM Spike (debug)*, enter the region and instance id
+   and tap *Start session with the signed-in role*.
+
+The SSO token and the client registration are stored encrypted with a key in
+Android Keystore and are excluded from backups; role credentials stay in
+memory.
 
 ## Roadmap
 

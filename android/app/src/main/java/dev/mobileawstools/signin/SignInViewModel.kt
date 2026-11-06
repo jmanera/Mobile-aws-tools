@@ -11,17 +11,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import dev.mobileawstools.core.aws.sso.EncryptedClientRegistrationStore
-import dev.mobileawstools.core.aws.sso.EncryptedSsoTokenStore
-import dev.mobileawstools.core.aws.sso.RoleCredentialsProvider
+import dev.mobileawstools.MobileAwsToolsApp
 import dev.mobileawstools.core.aws.sso.SdkSsoOidc
-import dev.mobileawstools.core.aws.sso.SdkSsoPortal
 import dev.mobileawstools.core.aws.sso.SignInRequiredException
 import dev.mobileawstools.core.aws.sso.SsoLogin
 import dev.mobileawstools.core.aws.sso.SsoRole
-import dev.mobileawstools.core.aws.sso.SsoSession
 import dev.mobileawstools.core.aws.sso.SsoToken
-import dev.mobileawstools.core.aws.store.KeystoreSecretBox
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -64,15 +59,10 @@ class SignInViewModel(app: Application) : AndroidViewModel(app) {
             stateHolder.value = value
         }
 
-    // Sealed with a Keystore key, in noBackupFilesDir: never in clear, never in a backup.
-    private val box = KeystoreSecretBox(KEY_ALIAS)
-    private val registrations = EncryptedClientRegistrationStore(app.noBackupFilesDir, box)
-    private val session = SsoSession(
-        tokens = EncryptedSsoTokenStore(app.noBackupFilesDir, box),
-        registrations = registrations,
-        oidcFor = ::SdkSsoOidc,
-    )
-    private val credentials = RoleCredentialsProvider(session, ::SdkSsoPortal)
+    private val aws = app as MobileAwsToolsApp
+    private val registrations = aws.registrations
+    private val session = aws.session
+    private val credentials = aws.credentials
     private var job: Job? = null
 
     var roles by mutableStateOf(RolesState())
@@ -123,6 +113,7 @@ class SignInViewModel(app: Application) : AndroidViewModel(app) {
         job?.cancel()
         session.signOut()
         roles = RolesState()
+        aws.selectedRole = null
         viewModelScope.launch { credentials.clear() }
         state = SignInState.Idle
     }
@@ -135,6 +126,7 @@ class SignInViewModel(app: Application) : AndroidViewModel(app) {
     fun credentialsFor(role: SsoRole) = launchRoles {
         val creds = withContext(Dispatchers.IO) { credentials.credentials(role) }
         Log.i(TAG, "Credentials for ${role.accountId}/${role.roleName}: $creds")
+        aws.selectedRole = role
         roles = roles.copy(
             selected = role,
             keyHint = "…" + creds.accessKeyId.takeLast(4),
@@ -191,6 +183,5 @@ class SignInViewModel(app: Application) : AndroidViewModel(app) {
         const val TAG = "signin"
         const val KEY_START_URL = "start_url"
         const val KEY_REGION = "region"
-        const val KEY_ALIAS = "sso-store"
     }
 }

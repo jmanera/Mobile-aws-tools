@@ -3,12 +3,14 @@
 
 package dev.mobileawstools.spike
 
+import android.app.Application
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mobileawstools.MobileAwsToolsApp
 import dev.mobileawstools.plugin.AwsContext
 import dev.mobileawstools.plugin.AwsCredentials
 import dev.mobileawstools.plugin.ConnectionListener
@@ -31,7 +33,7 @@ import java.io.File
  * There is no terminal emulator yet (phase 3): escape sequences are stripped
  * and output is shown as plain text.
  */
-class SpikeViewModel : ViewModel() {
+class SpikeViewModel(app: Application) : AndroidViewModel(app) {
 
     var region by mutableStateOf("eu-west-1")
     var targetId by mutableStateOf("")
@@ -65,8 +67,8 @@ class SpikeViewModel : ViewModel() {
 
     fun connect() {
         if (connection != null) return
-        val context = try {
-            AwsContext(region.trim(), parseCredentials(credentialsJson))
+        val credentials = try {
+            parseCredentials(credentialsJson)
         } catch (e: Exception) {
             // org.json messages quote the input, which would put the secret key on screen.
             val reason = if (e is IllegalArgumentException) e.message else "malformed or truncated JSON"
@@ -74,12 +76,28 @@ class SpikeViewModel : ViewModel() {
             Log.w(TAG, status)
             return
         }
+        open { credentials }
+    }
+
+    /** Opens the shell with credentials of the role picked on the sign-in screen. */
+    fun connectWithSignedInRole() {
+        if (connection != null) return
+        val aws = getApplication<MobileAwsToolsApp>()
+        val role = aws.selectedRole ?: run {
+            status = "Sign in and pick a role on the main screen first"
+            return
+        }
+        open { aws.credentials.credentials(role) }
+    }
+
+    private fun open(credentials: suspend () -> AwsCredentials) {
         status = "Starting session…"
         screen.clear()
         output = ""
         val target = Target(id = targetId.trim(), name = targetId.trim())
         viewModelScope.launch {
             try {
+                val context = AwsContext(region.trim(), credentials())
                 connection = plugin.connect(target, context, listener) as TerminalConnection
             } catch (e: Exception) {
                 status = "Failed: ${e.message}"
