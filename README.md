@@ -33,7 +33,11 @@ Why, and what had to change, is recorded in
 |------|----------|
 | `bridge/` | Go module `ssmbridge`: gomobile-friendly wrapper around the plugin's data channel |
 | `bridge/cmd/ssmshell` | Desktop harness to test the bridge against a real instance |
-| `android/` | Phase 0 spike app (Jetpack Compose) |
+| `android/app` | The app (Jetpack Compose); debug builds also ship the phase 0 spike |
+| `android/plugin-api` | Contract for target plugins (pure Kotlin) |
+| `android/core-aws` | SSO sign-in, token storage and role credentials |
+| `android/terminal` | Terminal emulator view (phase 3) |
+| `android/bridge` | Exposes the gomobile AAR to the other modules |
 | `docs/adr/` | Architecture decision records |
 
 ## Building
@@ -51,7 +55,7 @@ Build the bridge and the app:
 
 ```sh
 export ANDROID_HOME=~/Android/Sdk
-bridge/build-aar.sh                 # writes android/app/libs/ssmbridge.aar
+bridge/build-aar.sh                 # writes android/bridge/libs/ssmbridge.aar
 cd android && ./gradlew assembleDebug
 ```
 
@@ -80,12 +84,13 @@ cd bridge && go test ./...
    ```
 
 4. **On Android:** install `android/app/build/outputs/apk/debug/app-debug.apk`,
-   enter the region and instance id, then hand over temporary credentials
+   open *SSM Spike (debug)* from the launcher, enter the region and instance
+   id, then hand over temporary credentials
    with the device connected over USB (typing them with `adb shell input text`
    truncates the token):
 
    ```sh
-   aws sts get-session-token --duration-seconds 3600 | adb shell "run-as dev.mobileawstools.spike sh -c 'umask 077; mkdir -p files; cat > files/credentials.json'"
+   aws sts get-session-token --duration-seconds 3600 | adb shell "run-as dev.mobileawstools.debug sh -c 'umask 077; mkdir -p files; cat > files/credentials.json'"
    ```
 
    Tap *Load credentials file* (the app reads the file and deletes it), then
