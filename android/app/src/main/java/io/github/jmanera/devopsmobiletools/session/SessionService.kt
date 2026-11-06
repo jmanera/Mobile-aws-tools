@@ -105,16 +105,19 @@ class SessionService : Service() {
             1 -> "1 session open"
             else -> "${names.size} sessions open"
         }
-        return Notification.Builder(this, CHANNEL_ID)
+        val builder = Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_monochrome)
             .setContentTitle(title)
             .setContentText(names.joinToString(", "))
             .setContentIntent(open)
             .setOngoing(true)
             .setCategory(Notification.CATEGORY_SERVICE)
-            .setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
             .addAction(Notification.Action.Builder(null, "Disconnect all", disconnect).build())
-            .build()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Show it at once; Android 12+ otherwise delays it by up to ten seconds.
+            builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
+        }
+        return builder.build()
     }
 
     companion object {
