@@ -80,7 +80,15 @@ cd bridge && go test ./...
    ```
 
 4. **On Android:** install `android/app/build/outputs/apk/debug/app-debug.apk`,
-   enter the region and instance id, paste the credentials JSON and tap
+   enter the region and instance id, then hand over temporary credentials
+   with the device connected over USB (typing them with `adb shell input text`
+   truncates the token):
+
+   ```sh
+   aws sts get-session-token --duration-seconds 3600 | adb shell "run-as dev.mobileawstools.spike sh -c 'umask 077; mkdir -p files; cat > files/credentials.json'"
+   ```
+
+   Tap *Load credentials file* (the app reads the file and deletes it), then
    *Start session*.
 
 The spike shows output as plain text; a real terminal emulator arrives in

@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.File
 
 /**
  * Phase 0 spike: start a Session Manager shell with fixed temporary
@@ -68,7 +69,10 @@ class SpikeViewModel : ViewModel() {
         val creds = try {
             parseCredentials(credentialsJson)
         } catch (e: Exception) {
-            status = "Invalid credentials JSON: ${e.message}"
+            // org.json messages quote the input, which would put the secret key on screen.
+            val reason = if (e is IllegalArgumentException) e.message else "malformed or truncated JSON"
+            status = "Invalid credentials JSON (${credentialsJson.length} chars): $reason"
+            Log.w(TAG, status)
             return
         }
         status = "Starting session…"
@@ -91,6 +95,23 @@ class SpikeViewModel : ViewModel() {
                 status = "Failed: ${e.message}"
             }
         }
+    }
+
+    /**
+     * Loads the credentials JSON from a file in the app's private storage and
+     * deletes it, so long tokens do not have to be typed through `adb shell input`:
+     *
+     *     aws sts get-session-token | adb shell "run-as dev.mobileawstools.spike sh -c 'umask 077; mkdir -p files; cat > files/credentials.json'"
+     */
+    fun loadCredentials(file: File) {
+        if (!file.exists()) {
+            status = "No credentials file at ${file.path}"
+            return
+        }
+        credentialsJson = file.readText()
+        file.delete()
+        status = "Credentials loaded (${credentialsJson.length} chars)"
+        Log.i(TAG, status)
     }
 
     fun send(text: String) = write(text.toByteArray(Charsets.UTF_8))

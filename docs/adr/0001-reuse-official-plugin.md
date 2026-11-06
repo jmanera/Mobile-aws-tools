@@ -1,6 +1,6 @@
 # 0001. Reuse the official Session Manager plugin through a Go bridge
 
-- Status: Accepted (pending validation on a device against a real instance)
+- Status: Accepted (validated on a device against a real instance on 2026-11-06)
 - Date: 2026-11-05
 - Phase: 0 (spike)
 
@@ -105,8 +105,18 @@ The public API uses only types gomobile supports. Go `int` maps to Java
 | Unit tests (redaction, URL validation, config) | Pass |
 | AAR imported in a Compose app, `assembleDebug` | Done |
 | Desktop harness reaches `ssm:StartSession` | Done (fake credentials, 403 as expected) |
-| Shell on a real EC2 instance from the desktop harness | **Pending** |
-| Shell on a real EC2 instance from the phone | **Pending**: the phase 0 acceptance criterion |
+| Shell on a real EC2 instance from the desktop harness | Done (Amazon Linux 2023, SSM Agent 3.3.5700.0, eu-west-3) |
+| Shell on a real EC2 instance from the phone | Done: the phase 0 acceptance criterion (Lenovo TB336FU, Android 16, arm64) |
+
+Observations from the device run, none blocking:
+
+- The agent did not send a session type; the bridge assumes a shell and logs a warning.
+- One stream data message was resent and one out-of-order sequence number was
+  logged; the data channel recovered and no output was lost.
+- One plugin log line has a format bug (`%!(EXTRA string=…)`); it comes from
+  the plugin, not the bridge.
+- Typing the credentials JSON with `adb shell input text` truncated it. The
+  spike app now loads it from a file in its private storage instead.
 
 If the pending checks fail in a way that needs deep changes to the
 plugin, fall back to reimplementing the protocol in Kotlin (plan B), reading
