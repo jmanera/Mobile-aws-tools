@@ -17,6 +17,19 @@ interface ConnectionListener {
 /** An open connection. Closing it twice is allowed. */
 interface Connection {
     fun close()
+
+    /**
+     * The role's credentials were renewed. Connections that call AWS again
+     * after opening, such as to resume, should use these from now on.
+     */
+    fun updateCredentials(credentials: AwsCredentials) = Unit
+
+    /**
+     * The device's network came back or changed. A connection waiting to
+     * reconnect should try now; one that looks open may be dead and should
+     * reconnect on the new network.
+     */
+    fun networkChanged() = Unit
 }
 
 /** A connection that behaves like a terminal: bytes in, bytes out, a size. */

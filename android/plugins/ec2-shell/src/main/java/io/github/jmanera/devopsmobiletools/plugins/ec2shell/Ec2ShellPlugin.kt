@@ -5,6 +5,7 @@ package io.github.jmanera.devopsmobiletools.plugins.ec2shell
 
 import android.util.Log
 import io.github.jmanera.devopsmobiletools.plugin.AwsContext
+import io.github.jmanera.devopsmobiletools.plugin.AwsCredentials
 import io.github.jmanera.devopsmobiletools.plugin.Connection
 import io.github.jmanera.devopsmobiletools.plugin.ConnectionListener
 import io.github.jmanera.devopsmobiletools.plugin.ConnectionState
@@ -36,7 +37,7 @@ class Ec2ShellPlugin(
     override val info = PluginInfo(
         id = "io.github.jmanera.devopsmobiletools.ec2shell",
         name = "EC2 shell",
-        version = "0.2.0",
+        version = "0.3.0",
     )
 
     override val permissions = PERMISSIONS
@@ -83,6 +84,11 @@ class Ec2ShellPlugin(
         override fun resize(cols: Int, rows: Int) = session.resize(cols.toLong(), rows.toLong())
 
         override fun close() = session.close()
+
+        override fun updateCredentials(credentials: AwsCredentials) =
+            session.updateCredentials(credentials.accessKeyId, credentials.secretAccessKey, credentials.sessionToken)
+
+        override fun networkChanged() = session.networkChanged()
     }
 
     private class BridgeListener(private val listener: ConnectionListener) : Listener {
