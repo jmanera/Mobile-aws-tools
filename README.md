@@ -43,7 +43,7 @@ Why, and what had to change, is recorded in
 
 ## Building
 
-Requirements: Go 1.26+, JDK 17, Android SDK (platform 35) with an NDK,
+Requirements: Go 1.26+, JDK 17, Android SDK (platform 37) with an NDK,
 and gomobile:
 
 ```sh

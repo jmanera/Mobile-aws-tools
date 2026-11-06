@@ -1,12 +1,11 @@
 // Terminal emulator view fed by the bridge. Filled in phase 3.
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
 }
 
 android {
     namespace = "dev.mobileawstools.terminal"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 26

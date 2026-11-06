@@ -1,12 +1,11 @@
 // AWS access for the app: SSO sign-in, token storage and role credentials.
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
 }
 
 android {
     namespace = "dev.mobileawstools.core.aws"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 26

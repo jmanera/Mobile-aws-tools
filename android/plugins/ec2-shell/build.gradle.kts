@@ -1,12 +1,11 @@
 // Built-in plugin: interactive shell on an EC2 instance through Session Manager.
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
 }
 
 android {
     namespace = "dev.mobileawstools.plugins.ec2shell"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 26
