@@ -46,7 +46,10 @@ fun SessionScreen(target: Target, onBack: () -> Unit) {
 
         val terminal = vm.terminal
         AndroidView(
-            factory = { context -> createTerminalView(context, vm.modifiers) },
+            factory = { context ->
+                val prefs = TerminalPrefs(context)
+                createTerminalView(context, vm.modifiers, prefs.textSizeSp) { prefs.textSizeSp = it }
+            },
             // Reading vm.terminal here re-runs update when a reconnection brings a new terminal.
             update = { view -> terminal?.attach(view) },
             onRelease = { view -> vm.terminal?.detach(view) },
