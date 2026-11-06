@@ -4,18 +4,19 @@
 package io.github.jmanera.devopsmobiletools.terminal
 
 import android.content.Context
-import android.graphics.Typeface
 import android.util.Log
 import android.util.TypedValue
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.inputmethod.InputMethodManager
+import com.termux.terminal.TerminalColors
 import com.termux.terminal.TerminalSession
+import com.termux.terminal.TextStyle
 import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
 
 /**
- * Creates a [TerminalView] ready for a [RemoteTerminal]: monospace text,
+ * Creates a [TerminalView] ready for a [RemoteTerminal]: JetBrains Mono,
  * keyboard on tap, the on-screen keyboard without suggestions.
  */
 fun createTerminalView(context: Context, textSizeSp: Float = DEFAULT_TEXT_SIZE_SP): TerminalView {
@@ -24,7 +25,9 @@ fun createTerminalView(context: Context, textSizeSp: Float = DEFAULT_TEXT_SIZE_S
     view.setTextSize(
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, textSizeSp, context.resources.displayMetrics).toInt(),
     )
-    view.setTypeface(Typeface.MONOSPACE)
+    // The system monospace font varies by device and some barely tell i, l and 1 apart.
+    view.setTypeface(context.resources.getFont(R.font.jetbrains_mono_nl_regular))
+    view.setBackgroundColor(TerminalColors.COLOR_SCHEME.mDefaultColors[TextStyle.COLOR_INDEX_BACKGROUND])
     view.isFocusable = true
     view.isFocusableInTouchMode = true
     return view
@@ -73,7 +76,11 @@ private class ViewClient(private val view: TerminalView) : TerminalViewClient {
 
     override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession) = false
 
-    override fun onEmulatorSet() = Unit
+    // A new emulator brings its own palette; repaint the background in its colour.
+    override fun onEmulatorSet() {
+        val colors = view.currentSession?.emulator?.mColors?.mCurrentColors ?: return
+        view.setBackgroundColor(colors[TextStyle.COLOR_INDEX_BACKGROUND])
+    }
 
     override fun logError(tag: String, message: String) { Log.e(tag, message) }
     override fun logWarn(tag: String, message: String) { Log.w(tag, message) }

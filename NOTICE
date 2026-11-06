@@ -26,6 +26,15 @@ docs/adr/0002-vendor-termux-terminal.md:
   https://github.com/jackpal/Android-Terminal-Emulator
   Licensed under the Apache License, Version 2.0.
 
+This product includes the JetBrains Mono font (no-ligatures variant), in
+android/terminal/src/main/res/font, unmodified:
+
+  JetBrains Mono
+  https://github.com/JetBrains/JetBrainsMono
+  Copyright 2020 The JetBrains Mono Project Authors.
+  Licensed under the SIL Open Font License, Version 1.1
+  (see android/terminal/third_party/jetbrains-mono/OFL.txt).
+
 Binary builds of the bridge also link, unmodified: the AWS SDK for Go v2 and
 smithy-go (Apache-2.0), gorilla/websocket (BSD-2-Clause), cihub/seelog
 (BSD-3-Clause), fsnotify (BSD-3-Clause), stretchr/testify and stretchr/objx

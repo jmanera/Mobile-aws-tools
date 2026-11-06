@@ -7,9 +7,11 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.util.Log
+import com.termux.terminal.TerminalColors
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import com.termux.terminal.TerminalTransport
+import com.termux.terminal.TextStyle
 import com.termux.view.TerminalView
 
 /**
@@ -35,6 +37,7 @@ class RemoteTerminal(
     fun attach(view: TerminalView) {
         this.view = view
         view.attachSession(session)
+        paintBackground(view)
     }
 
     fun detach(view: TerminalView) {
@@ -74,7 +77,18 @@ class RemoteTerminal(
     override fun onBell(session: TerminalSession) = Unit
 
     override fun onColorsChanged(session: TerminalSession) {
-        view?.invalidate()
+        view?.let(::paintBackground)
+    }
+
+    /**
+     * The renderer skips cells in the default background colour; the view's
+     * own background has to be that colour, or text lands on whatever is
+     * behind it.
+     */
+    private fun paintBackground(view: TerminalView) {
+        val colors = session.emulator?.mColors?.mCurrentColors ?: TerminalColors.COLOR_SCHEME.mDefaultColors
+        view.setBackgroundColor(colors[TextStyle.COLOR_INDEX_BACKGROUND])
+        view.invalidate()
     }
 
     override fun onTerminalCursorStateChange(state: Boolean) = Unit
