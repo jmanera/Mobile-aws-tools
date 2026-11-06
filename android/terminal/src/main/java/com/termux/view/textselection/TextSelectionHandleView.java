@@ -1,5 +1,6 @@
 package com.termux.view.textselection;
 
+import io.github.jmanera.devopsmobiletools.terminal.R;
 import android.annotation.SuppressLint;
 import android.graphics.Canvas;
 import android.graphics.Rect;
@@ -12,7 +13,6 @@ import android.view.ViewParent;
 import android.view.WindowManager;
 import android.widget.PopupWindow;
 
-import com.termux.view.R;
 import com.termux.view.TerminalView;
 
 @SuppressLint("ViewConstructor")

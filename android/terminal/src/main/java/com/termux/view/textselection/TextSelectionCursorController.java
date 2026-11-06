@@ -1,5 +1,6 @@
 package com.termux.view.textselection;
 
+import io.github.jmanera.devopsmobiletools.terminal.R;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -16,7 +17,6 @@ import androidx.annotation.Nullable;
 
 import com.termux.terminal.TerminalBuffer;
 import com.termux.terminal.WcWidth;
-import com.termux.view.R;
 import com.termux.view.TerminalView;
 
 public class TextSelectionCursorController implements CursorController {
