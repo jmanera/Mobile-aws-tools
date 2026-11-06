@@ -19,7 +19,11 @@ android {
 
 dependencies {
     api(project(":plugin-api"))
+    implementation(libs.aws.ssooidc)
+    implementation(libs.kotlinx.coroutines.core)
+
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
 
 kotlin {

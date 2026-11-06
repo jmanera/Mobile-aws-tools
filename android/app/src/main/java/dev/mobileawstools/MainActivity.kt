@@ -8,19 +8,14 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import dev.mobileawstools.signin.SignInScreen
 
-/** Entry point of the app. Sign-in with IAM Identity Center lands here next (phase 1). */
+/** Entry point of the app: sign-in with IAM Identity Center. */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,15 +24,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
-                Surface(Modifier.fillMaxSize()) {
-                    Column(
-                        Modifier.safeDrawingPadding().padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text("Mobile AWS Tools", style = MaterialTheme.typography.headlineSmall)
-                        Text("Sign-in with IAM Identity Center is coming in phase 1.")
-                    }
-                }
+                Surface(Modifier.fillMaxSize()) { SignInScreen() }
             }
         }
     }
