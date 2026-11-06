@@ -76,29 +76,25 @@ class SpikeViewModel(app: Application) : AndroidViewModel(app) {
             Log.w(TAG, status)
             return
         }
-        open { credentials }
+        val region = region.trim()
+        open { AwsContext(region, credentials) }
     }
 
-    /** Opens the shell with credentials of the role picked on the sign-in screen. */
+    /** Opens the shell as the role and in the region picked on the main screen; the region field is ignored. */
     fun connectWithSignedInRole() {
         if (connection != null) return
         val aws = getApplication<DevOpsMobileToolsApp>()
-        val role = aws.selectedRole ?: run {
-            status = "Sign in and pick a role on the main screen first"
-            return
-        }
-        open { aws.credentials.credentials(role) }
+        open { aws.contexts.context() }
     }
 
-    private fun open(credentials: suspend () -> AwsCredentials) {
+    private fun open(context: suspend () -> AwsContext) {
         status = "Starting session…"
         screen.clear()
         output = ""
         val target = Target(id = targetId.trim(), name = targetId.trim())
         viewModelScope.launch {
             try {
-                val context = AwsContext(region.trim(), credentials())
-                connection = plugin.connect(target, context, listener) as TerminalConnection
+                connection = plugin.connect(target, context(), listener) as TerminalConnection
             } catch (e: Exception) {
                 status = "Failed: ${e.message}"
             }

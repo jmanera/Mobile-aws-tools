@@ -10,13 +10,24 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -26,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.jmanera.devopsmobiletools.R
+import io.github.jmanera.devopsmobiletools.core.aws.context.AwsRegion
+import io.github.jmanera.devopsmobiletools.core.aws.context.AwsRegions
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -37,7 +50,7 @@ fun SignInScreen(vm: SignInViewModel = viewModel()) {
     }
 
     Column(
-        Modifier.safeDrawingPadding().padding(24.dp),
+        Modifier.verticalScroll(rememberScrollState()).safeDrawingPadding().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
@@ -87,7 +100,7 @@ fun SignInScreen(vm: SignInViewModel = viewModel()) {
                     OutlinedButton(onClick = vm::refreshNow, modifier = Modifier.fillMaxWidth()) { Text("Refresh now") }
                 }
                 OutlinedButton(onClick = vm::signOut, modifier = Modifier.fillMaxWidth()) { Text("Sign out") }
-                RolesSection(vm)
+                PickerSection(vm)
             }
         }
     }
@@ -96,21 +109,83 @@ fun SignInScreen(vm: SignInViewModel = viewModel()) {
 private val TIME = DateTimeFormatter.ofPattern("HH:mm")
 
 @Composable
-private fun RolesSection(vm: SignInViewModel) {
-    val roles = vm.roles
-    Text("Roles", style = MaterialTheme.typography.titleMedium)
-    if (roles.roles.isEmpty()) {
-        Button(onClick = vm::loadRoles, modifier = Modifier.fillMaxWidth()) { Text("Load my accounts and roles") }
+private fun PickerSection(vm: SignInViewModel) {
+    val p = vm.picker
+    Text("Work as", style = MaterialTheme.typography.titleMedium)
+    if (p.loading && p.roles.isEmpty()) Text("Loading your accounts and roles…")
+    if (!p.loading && p.roles.isEmpty()) {
+        OutlinedButton(onClick = vm::loadRoles, modifier = Modifier.fillMaxWidth()) { Text("Load my accounts and roles") }
     }
-    for (role in roles.roles) {
-        OutlinedButton(onClick = { vm.credentialsFor(role) }, modifier = Modifier.fillMaxWidth()) {
-            Text("${role.accountName} (${role.accountId}) · ${role.roleName}")
+    if (p.roles.isNotEmpty()) {
+        Picker(
+            label = "Account",
+            options = p.accounts,
+            selected = p.account,
+            describe = { "${it.name} (${it.id})" },
+            onPick = vm::pickAccount,
+        )
+        Picker(
+            label = "Role",
+            options = p.accountRoles,
+            selected = p.role,
+            describe = { it.roleName },
+            onPick = vm::pickRole,
+            enabled = p.account != null,
+        )
+        Picker(
+            label = "Region",
+            options = AwsRegions.ALL,
+            selected = AwsRegions.of(p.region),
+            describe = AwsRegion::toString,
+            onPick = { vm.pickRegion(it.code) },
+        )
+        Button(onClick = vm::apply, enabled = p.canApply && !p.loading, modifier = Modifier.fillMaxWidth()) {
+            Text("Use this role and region")
         }
     }
-    val selected = roles.selected
-    if (selected != null && roles.expiresAt != null) {
-        val time = TIME.format(roles.expiresAt.atZone(ZoneId.systemDefault()))
-        Text("Credentials for ${selected.roleName}: key ${roles.keyHint}, valid until $time.")
+    val active = p.active
+    if (active != null && p.expiresAt != null) {
+        val time = TIME.format(p.expiresAt.atZone(ZoneId.systemDefault()))
+        Text(
+            "Working as ${active.role.roleName} in ${active.role.accountName}, ${active.region}. " +
+                "Credentials ${p.keyHint}, valid until $time and renewed automatically.",
+        )
     }
-    roles.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+    p.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun <T> Picker(
+    label: String,
+    options: List<T>,
+    selected: T?,
+    describe: (T) -> String,
+    onPick: (T) -> Unit,
+    enabled: Boolean = true,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(expanded = expanded && enabled, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = selected?.let(describe).orEmpty(),
+            onValueChange = {},
+            readOnly = true,
+            enabled = enabled,
+            singleLine = true,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded && enabled) },
+            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled).fillMaxWidth(),
+        )
+        ExposedDropdownMenu(expanded = expanded && enabled, onDismissRequest = { expanded = false }) {
+            for (option in options) {
+                DropdownMenuItem(
+                    text = { Text(describe(option)) },
+                    onClick = {
+                        expanded = false
+                        onPick(option)
+                    },
+                )
+            }
+        }
+    }
 }

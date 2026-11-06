@@ -4,16 +4,18 @@
 package io.github.jmanera.devopsmobiletools
 
 import android.app.Application
+import io.github.jmanera.devopsmobiletools.core.aws.context.AwsContextProvider
+import io.github.jmanera.devopsmobiletools.core.aws.context.FileSelectionStore
 import io.github.jmanera.devopsmobiletools.core.aws.sso.EncryptedClientRegistrationStore
 import io.github.jmanera.devopsmobiletools.core.aws.sso.EncryptedSsoTokenStore
 import io.github.jmanera.devopsmobiletools.core.aws.sso.RoleCredentialsProvider
 import io.github.jmanera.devopsmobiletools.core.aws.sso.SdkSsoOidc
 import io.github.jmanera.devopsmobiletools.core.aws.sso.SdkSsoPortal
-import io.github.jmanera.devopsmobiletools.core.aws.sso.SsoRole
 import io.github.jmanera.devopsmobiletools.core.aws.sso.SsoSession
 import io.github.jmanera.devopsmobiletools.core.aws.store.KeystoreSecretBox
+import java.io.File
 
-/** Holds what every screen shares: the SSO session and the role credentials it hands out. */
+/** Holds what every screen shares: the SSO session, the picked role and region, and their credentials. */
 class DevOpsMobileToolsApp : Application() {
 
     // Sealed with a Keystore key, in noBackupFilesDir: never in clear, never in a backup.
@@ -32,8 +34,10 @@ class DevOpsMobileToolsApp : Application() {
     /** One cache for the whole process, so every screen reuses the same credentials. */
     val credentials by lazy { RoleCredentialsProvider(session, ::SdkSsoPortal) }
 
-    /** The role last picked on the sign-in screen; in memory only. */
-    @Volatile var selectedRole: SsoRole? = null
+    /** The picked role and region, remembered in a plain file: neither is secret. */
+    val contexts by lazy {
+        AwsContextProvider(session, credentials, FileSelectionStore(File(filesDir, "selection.properties")))
+    }
 
     private companion object {
         const val KEY_ALIAS = "sso-store"
