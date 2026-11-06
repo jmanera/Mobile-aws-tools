@@ -35,8 +35,14 @@ class SignInViewModel(app: Application) : AndroidViewModel(app) {
     var startUrl by mutableStateOf(prefs.getString(KEY_START_URL, "").orEmpty())
     var region by mutableStateOf(prefs.getString(KEY_REGION, "eu-west-1").orEmpty())
 
-    var state by mutableStateOf<SignInState>(SignInState.Idle)
-        private set
+    private val stateHolder = mutableStateOf<SignInState>(SignInState.Idle)
+    var state: SignInState
+        get() = stateHolder.value
+        private set(value) {
+            // States carry no secrets: the user code is shown on screen anyway.
+            Log.i(TAG, "State: $value")
+            stateHolder.value = value
+        }
 
     /** Held in memory only until encrypted storage lands (#17). */
     private var token: SsoToken? = null
@@ -74,6 +80,10 @@ class SignInViewModel(app: Application) : AndroidViewModel(app) {
     fun cancel() {
         job?.cancel()
         state = SignInState.Idle
+    }
+
+    override fun onCleared() {
+        Log.i(TAG, "Cleared while $state")
     }
 
     private companion object {

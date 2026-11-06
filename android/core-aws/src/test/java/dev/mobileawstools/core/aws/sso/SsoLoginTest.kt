@@ -77,6 +77,18 @@ class SsoLoginTest {
     }
 
     @Test
+    fun keepsPollingWhileTheNetworkIsDown() = runTest {
+        oidc.polls += listOf(
+            TokenPoll.Unreachable("Unable to resolve host"),
+            TokenPoll.Unreachable("Unable to resolve host"),
+            TokenPoll.Granted("access", "refresh", 3600),
+        )
+        val (registration, auth) = login().start()
+        assertEquals("access", login().awaitToken(registration, auth).accessToken)
+        assertEquals(2, sleeps.size)
+    }
+
+    @Test
     fun deniedStopsPolling() = runTest {
         oidc.polls += TokenPoll.Denied("access_denied")
         val (registration, auth) = login().start()

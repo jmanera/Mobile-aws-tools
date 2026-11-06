@@ -55,6 +55,12 @@ sealed interface TokenPoll {
 
     /** The device code expired before the user approved. */
     data object Expired : TokenPoll
+
+    /**
+     * The call did not reach IAM Identity Center. Usual while the user is in
+     * the browser: Android may cut the network of an app in the background.
+     */
+    data class Unreachable(val reason: String) : TokenPoll
 }
 
 class SsoLoginException(message: String, cause: Throwable? = null) : Exception(message, cause)

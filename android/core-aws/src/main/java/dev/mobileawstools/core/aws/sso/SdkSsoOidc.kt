@@ -12,8 +12,10 @@ import aws.sdk.kotlin.services.ssooidc.model.SlowDownException
 import aws.sdk.kotlin.services.ssooidc.registerClient
 import aws.sdk.kotlin.services.ssooidc.startDeviceAuthorization
 import aws.sdk.kotlin.services.ssooidc.createToken
+import aws.smithy.kotlin.runtime.http.HttpException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.time.Instant
 
 /**
@@ -78,6 +80,10 @@ class SdkSsoOidc(private val region: String) : SsoOidc {
                 TokenPoll.Denied(e.error ?: "access_denied")
             } catch (e: InvalidGrantException) {
                 TokenPoll.Denied(e.error ?: "invalid_grant")
+            } catch (e: HttpException) {
+                TokenPoll.Unreachable(e.message ?: e.javaClass.simpleName)
+            } catch (e: IOException) {
+                TokenPoll.Unreachable(e.message ?: e.javaClass.simpleName)
             }
         } }
 

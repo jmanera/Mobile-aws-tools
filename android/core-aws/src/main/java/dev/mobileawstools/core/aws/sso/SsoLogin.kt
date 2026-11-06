@@ -42,7 +42,8 @@ class SsoLogin(
                     region = region,
                     startUrl = startUrl,
                 )
-                TokenPoll.Pending -> Unit
+                // Keep trying until the code expires; the network comes back with the app.
+                TokenPoll.Pending, is TokenPoll.Unreachable -> Unit
                 // RFC 8628: add 5 seconds to the interval on slow_down.
                 TokenPoll.SlowDown -> interval = interval.plusSeconds(5)
                 is TokenPoll.Denied -> throw SsoLoginException("Sign-in was denied: ${poll.reason}")
