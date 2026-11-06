@@ -35,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -42,6 +43,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.io.File
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,6 +88,9 @@ private fun ConnectForm(vm: SpikeViewModel) {
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             singleLine = true, modifier = Modifier.fillMaxWidth(),
         )
+        val filesDir = LocalContext.current.filesDir
+        OutlinedButton(onClick = { vm.loadCredentials(File(filesDir, "credentials.json")) },
+            modifier = Modifier.fillMaxWidth()) { Text("Load credentials file") }
         Button(onClick = vm::connect, modifier = Modifier.fillMaxWidth()) { Text("Start session") }
         if (vm.output.isNotEmpty()) {
             Text(vm.output.takeLast(2000), fontFamily = FontFamily.Monospace, fontSize = 12.sp)
