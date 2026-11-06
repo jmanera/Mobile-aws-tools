@@ -3,13 +3,10 @@
 
 package io.github.jmanera.devopsmobiletools.session
 
-import android.app.Application
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
 import com.termux.terminal.TerminalTransport
 import io.github.jmanera.devopsmobiletools.DevOpsMobileToolsApp
 import io.github.jmanera.devopsmobiletools.plugin.ConnectionListener
@@ -20,18 +17,22 @@ import io.github.jmanera.devopsmobiletools.terminal.ExtraKey
 import io.github.jmanera.devopsmobiletools.terminal.Modifier
 import io.github.jmanera.devopsmobiletools.terminal.RemoteTerminal
 import io.github.jmanera.devopsmobiletools.terminal.StickyModifiers
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
  * A shell on [target] with the selected role and region, shown in a
- * terminal emulator. The terminal outlives the view, so a rotation keeps
- * the screen; closing the screen closes the session.
+ * terminal emulator. Owned by [SessionManager], not by a screen: it keeps
+ * running when the user leaves the screen or the app, until [disconnect] or
+ * the remote side ends it. [scope] runs on the main thread.
  */
-class SessionViewModel(app: Application, val target: Target) : AndroidViewModel(app) {
-
-    private val aws = app as DevOpsMobileToolsApp
+class LiveSession(
+    private val aws: DevOpsMobileToolsApp,
+    val target: Target,
+    private val scope: CoroutineScope,
+) {
 
     var status by mutableStateOf("Starting session…")
         private set
@@ -54,6 +55,9 @@ class SessionViewModel(app: Application, val target: Target) : AndroidViewModel(
 
     @Volatile private var connection: TerminalConnection? = null
 
+    /** Set by [disconnect]; a connection still being opened is closed as soon as it exists. */
+    @Volatile private var closing = false
+
     /** The size the view last asked for; applied once the connection exists. */
     @Volatile private var size: Pair<Int, Int>? = null
 
@@ -64,7 +68,7 @@ class SessionViewModel(app: Application, val target: Target) : AndroidViewModel(
             try {
                 c.write(data.copyOfRange(offset, offset + count))
             } catch (e: Exception) {
-                viewModelScope.launch { status = "Write failed: ${e.message}" }
+                scope.launch { status = "Write failed: ${e.message}" }
             }
         }
 
@@ -85,15 +89,20 @@ class SessionViewModel(app: Application, val target: Target) : AndroidViewModel(
 
     fun connect() {
         if (connection != null) return
-        val t = RemoteTerminal(getApplication(), transport, modifiers)
+        closing = false
+        val t = RemoteTerminal(aws, transport, modifiers)
         terminal = t
         show(ConnectionState.CONNECTING, "")
-        viewModelScope.launch {
+        scope.launch {
             try {
                 val context = withContext(Dispatchers.IO) { aws.contexts.context() }
                 val c = aws.ec2Shell.connect(target, context, Listener(t)) as TerminalConnection
                 if (ended) {
                     // Failed while connecting; the listener already told the terminal.
+                    return@launch
+                }
+                if (closing) {
+                    withContext(Dispatchers.IO) { runCatching { c.close() } }
                     return@launch
                 }
                 connection = c
@@ -115,15 +124,16 @@ class SessionViewModel(app: Application, val target: Target) : AndroidViewModel(
     fun lock(modifier: Modifier) = modifiers.lock(modifier)
 
     fun disconnect() {
+        closing = true
         val c = connection ?: return
         connection = null
-        viewModelScope.launch(Dispatchers.IO) { runCatching { c.close() } }
+        scope.launch(Dispatchers.IO) { runCatching { c.close() } }
     }
 
     /** The bridge starts sessions at 80x24; tell it the size the view really has. */
     private fun applySize(c: TerminalConnection) {
         val (cols, rows) = size ?: return
-        viewModelScope.launch(Dispatchers.IO) {
+        scope.launch(Dispatchers.IO) {
             try {
                 c.resize(cols, rows)
             } catch (e: Exception) {
@@ -140,7 +150,7 @@ class SessionViewModel(app: Application, val target: Target) : AndroidViewModel(
             if (state == ConnectionState.CLOSED || state == ConnectionState.FAILED) {
                 t.onClosed(if (state == ConnectionState.CLOSED) "Session closed" else "Session failed: $detail")
             }
-            viewModelScope.launch {
+            scope.launch {
                 if (terminal === t) show(state, detail)
             }
         }
@@ -157,12 +167,6 @@ class SessionViewModel(app: Application, val target: Target) : AndroidViewModel(
             ConnectionState.FAILED -> "Session failed"
         }
         status = if (detail.isBlank()) name else "$name: $detail"
-    }
-
-    override fun onCleared() {
-        // viewModelScope is already cancelled; close on a plain thread.
-        connection?.let { c -> Thread { runCatching { c.close() } }.start() }
-        connection = null
     }
 
     private companion object {
