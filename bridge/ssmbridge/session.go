@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"math/big"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -26,7 +25,6 @@ import (
 	pluginlog "github.com/aws/session-manager-plugin/src/log"
 	"github.com/aws/session-manager-plugin/src/message"
 	"github.com/aws/session-manager-plugin/src/retry"
-	"github.com/aws/session-manager-plugin/src/sdkutil"
 )
 
 // Session states reported through Listener.OnStateChanged.
@@ -135,11 +133,6 @@ func newSession(c Config, listener Listener, sink LogSink) *Session {
 	return s
 }
 
-// processCredsMu guards the process environment. The plugin builds its KMS
-// client from the default AWS config chain, so credentials must be visible
-// there; see docs/adr/0001-reuse-official-plugin.md.
-var processCredsMu sync.Mutex
-
 // Connect attaches to an existing session. It blocks until the WebSocket is
 // open and returns; the shell becomes usable once the listener reports
 // StateConnected.
@@ -164,10 +157,13 @@ func Connect(cfg *Config, listener Listener, sink LogSink) (*Session, error) {
 		Source:          "ssmbridge",
 	}
 	s.ssm = newSSMClient(c.Region, c.AccessKeyID, c.SecretAccessKey, c.SessionToken)
-	exposeCredentialsToPlugin(c)
+	configureSDK()
+	// Before opening: the KMS handshake can come with the first messages.
+	s.register()
 
 	s.setState(StateConnecting, "")
 	if err := s.open(); err != nil {
+		s.unregister()
 		s.setState(StateFailed, err.Error())
 		return nil, err
 	}
@@ -356,7 +352,7 @@ func (s *Session) NetworkChanged() {
 }
 
 // UpdateCredentials replaces the temporary credentials used to resume and
-// terminate the session and to sign new WebSocket connections. Call it when
+// terminate the session, to sign new WebSocket connections and for KMS. Call it when
 // the role's credentials are renewed, so a session can still resume after
 // the first ones expire.
 func (s *Session) UpdateCredentials(accessKeyID, secretAccessKey, sessionToken string) error {
@@ -373,9 +369,6 @@ func (s *Session) UpdateCredentials(accessKeyID, secretAccessKey, sessionToken s
 	}
 	s.ssm = newSSMClient(s.cfg.Region, accessKeyID, secretAccessKey, sessionToken)
 	s.credsMu.Unlock()
-	c := s.cfg
-	c.AccessKeyID, c.SecretAccessKey, c.SessionToken = accessKeyID, secretAccessKey, sessionToken
-	exposeCredentialsToPlugin(c)
 	return nil
 }
 
@@ -496,6 +489,7 @@ func (s *Session) shutdown(state int, detail string) {
 		s.closed = true
 		s.mu.Unlock()
 		close(s.done)
+		s.unregister()
 		if s.dc != nil {
 			if err := s.dc.Close(s.log); err != nil {
 				s.log.Debugf("Closing data channel: %v", err)
@@ -542,22 +536,6 @@ func newSSMClient(region, accessKeyID, secretAccessKey, sessionToken string) *ss
 		Region:      region,
 		Credentials: credentials.NewStaticCredentialsProvider(accessKeyID, secretAccessKey, sessionToken),
 	})
-}
-
-// exposeCredentialsToPlugin makes the credentials visible to the plugin's
-// default config chain, which it uses to build its KMS client. Only one
-// session per process is supported until this is removed.
-func exposeCredentialsToPlugin(c Config) {
-	processCredsMu.Lock()
-	defer processCredsMu.Unlock()
-	os.Setenv("AWS_ACCESS_KEY_ID", c.AccessKeyID)
-	os.Setenv("AWS_SECRET_ACCESS_KEY", c.SecretAccessKey)
-	os.Setenv("AWS_SESSION_TOKEN", c.SessionToken)
-	os.Setenv("AWS_REGION", c.Region)
-	// Keep the SDK away from shared config files that do not exist on Android.
-	os.Setenv("AWS_CONFIG_FILE", os.DevNull)
-	os.Setenv("AWS_SHARED_CREDENTIALS_FILE", os.DevNull)
-	sdkutil.SetRegionAndProfile(c.Region, "")
 }
 
 func validateConfig(c *Config) error {
