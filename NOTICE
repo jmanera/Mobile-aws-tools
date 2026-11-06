@@ -16,6 +16,16 @@ Manager Plugin, in bridge/third_party/twinj-uuid:
   Copyright (C) 2014 by Daniel Kemp, derivative work
   Licensed under the MIT License (see bridge/third_party/twinj-uuid/LICENSE).
 
+This product includes the terminal-emulator and terminal-view libraries of
+Termux, in android/terminal, adapted to a remote session as described in
+docs/adr/0002-vendor-termux-terminal.md:
+
+  Termux
+  https://github.com/termux/termux-app
+  Based on Terminal Emulator for Android by Jack Palevich
+  https://github.com/jackpal/Android-Terminal-Emulator
+  Licensed under the Apache License, Version 2.0.
+
 Binary builds of the bridge also link, unmodified: the AWS SDK for Go v2 and
 smithy-go (Apache-2.0), gorilla/websocket (BSD-2-Clause), cihub/seelog
 (BSD-3-Clause), fsnotify (BSD-3-Clause), stretchr/testify and stretchr/objx

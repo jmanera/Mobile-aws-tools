@@ -36,7 +36,8 @@ acknowledgements, retransmission, KMS encryption) is handled by the data
 channel of the official [session-manager-plugin](https://github.com/aws/session-manager-plugin),
 compiled for Android with [gomobile](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile).
 Why, and what had to change, is recorded in
-[ADR 0001](docs/adr/0001-reuse-official-plugin.md).
+[ADR 0001](docs/adr/0001-reuse-official-plugin.md). The terminal emulator
+comes from Termux ([ADR 0002](docs/adr/0002-vendor-termux-terminal.md)).
 
 ## Repository layout
 
@@ -48,7 +49,7 @@ Why, and what had to change, is recorded in
 | `android/plugin-api` | Contract for target plugins (pure Kotlin) |
 | `android/plugins/ec2-shell` | Built-in plugin: EC2 shell through Session Manager |
 | `android/core-aws` | SSO sign-in, token storage and role credentials |
-| `android/terminal` | Terminal emulator view (phase 3) |
+| `android/terminal` | Terminal emulator and view, vendored from Termux and fed by a remote session ([ADR 0002](docs/adr/0002-vendor-termux-terminal.md)) |
 | `android/bridge` | Exposes the gomobile AAR to the other modules |
 | `docs/adr/` | Architecture decision records |
 | `docs/brand/` | Logo, icon masters, palette and how the Android icon is built |
@@ -193,6 +194,7 @@ Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 ## License
 
 [Apache License 2.0](LICENSE). This project includes code from the AWS Session
-Manager plugin (Apache-2.0) and `twinj/uuid` (MIT); see [NOTICE](NOTICE).
+Manager plugin (Apache-2.0), the Termux terminal libraries (Apache-2.0) and
+`twinj/uuid` (MIT); see [NOTICE](NOTICE).
 
 This project is not affiliated with or endorsed by Amazon Web Services.
