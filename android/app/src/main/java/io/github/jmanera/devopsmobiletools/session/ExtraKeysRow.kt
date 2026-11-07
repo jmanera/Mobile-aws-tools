@@ -29,18 +29,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.jmanera.devopsmobiletools.terminal.ExtraKey
 import io.github.jmanera.devopsmobiletools.terminal.StickyModifiers
+import io.github.jmanera.devopsmobiletools.ui.Brand
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import io.github.jmanera.devopsmobiletools.terminal.R as TerminalR
 
 private val KeysFont = FontFamily(Font(TerminalR.font.jetbrains_mono_nl_regular))
-private val RowBackground = Color(0xFF000000)
+private val RowBackground = Brand.Navy
+private val KeyBackground = Color(0xFF13355A)
 private val KeyColor = Color(0xFFE0E0E0)
-private val ActiveColor = Color(0xFF26A69A)
+private val ActiveColor = Brand.Cyan
 
 /**
- * Keys a phone keyboard lacks, in the terminal's colours. Arrows and page
+ * Keys a phone keyboard lacks, on the brand's navy. Arrows and page
  * keys repeat while held; CTRL and ALT apply to the next key on a tap and
  * stay on after a long press, until tapped again.
  */
@@ -51,9 +53,9 @@ fun ExtraKeysRow(
     onLock: (io.github.jmanera.devopsmobiletools.terminal.Modifier) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier.fillMaxWidth().background(RowBackground).padding(vertical = 2.dp)) {
+    Column(modifier.fillMaxWidth().background(RowBackground).padding(horizontal = 2.dp, vertical = 4.dp)) {
         for (row in ExtraKey.ROWS) {
-            Row(Modifier.fillMaxWidth().height(40.dp)) {
+            Row(Modifier.fillMaxWidth().height(42.dp)) {
                 for (key in row) {
                     val state = (key as? ExtraKey.Mod)?.let { modifierState(it.modifier) } ?: StickyModifiers.State.OFF
                     KeyCell(key, state, onKey, onLock, Modifier.weight(1f))
@@ -80,8 +82,8 @@ private fun KeyCell(
         modifier
             .fillMaxHeight()
             .padding(2.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(if (state == StickyModifiers.State.LOCKED) ActiveColor.copy(alpha = 0.35f) else Color.Transparent)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (state == StickyModifiers.State.LOCKED) ActiveColor.copy(alpha = 0.35f) else KeyBackground)
             .pointerInput(key) {
                 detectTapGestures(
                     onPress = {

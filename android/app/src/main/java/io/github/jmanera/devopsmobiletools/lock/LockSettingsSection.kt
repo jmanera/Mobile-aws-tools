@@ -3,6 +3,7 @@
 
 package io.github.jmanera.devopsmobiletools.lock
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.FilterChip
@@ -19,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import io.github.jmanera.devopsmobiletools.DevOpsMobileToolsApp
 import java.time.Duration
 
@@ -31,9 +33,9 @@ fun LockSettingsSection() {
     var enabled by remember { mutableStateOf(lock.settings.enabled) }
     var timeout by remember { mutableStateOf(lock.settings.timeout) }
 
-    Text("Security", style = MaterialTheme.typography.titleMedium)
+    // The card around it (SignInScreen) carries the "Security" title.
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text("Lock with biometrics or the screen lock", Modifier.weight(1f))
+        Text("Lock with biometrics or the screen lock", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
         Switch(
             checked = enabled && canAuthenticate,
             enabled = canAuthenticate,
@@ -50,8 +52,12 @@ fun LockSettingsSection() {
             color = MaterialTheme.colorScheme.error,
         )
     } else if (enabled) {
-        Text("Lock after the app is in the background for", style = MaterialTheme.typography.bodyMedium)
-        FlowRow {
+        Text(
+            "Lock after the app is in the background for",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (choice in LockSettings.TIMEOUTS) {
                 FilterChip(
                     selected = choice == timeout,
