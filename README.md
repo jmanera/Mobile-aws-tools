@@ -13,12 +13,14 @@ Session Manager**: sign in with IAM Identity Center, pick an instance and get
 a shell from your phone, with no SSH keys and no inbound ports. More targets
 (RDS, DynamoDB) arrive as plugins.
 
-> **Status: phase 3 (terminal) done.** The app signs in with IAM Identity
+> **Status: phase 4 (robustness) done.** The app signs in with IAM Identity
 > Center, lets you pick the account, role and region, lists the instances
 > whose SSM Agent is online and opens a shell on one in a full terminal
 > emulator: colours, vim, htop and less, an extra-keys row, rotation and
-> pinch to zoom. Keeping sessions alive in the background, reconnection and
-> a biometric lock come in phase 4. See the [roadmap](#roadmap).
+> pinch to zoom. Sessions keep running in the background, reconnect after a
+> network drop, and the app locks with biometrics or the screen lock; errors
+> say what went wrong and what to do. A signed release comes in phase 5. See
+> the [roadmap](#roadmap) and the [user guide](docs/user-guide.md).
 
 ## How it works
 
